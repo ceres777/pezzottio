@@ -29,7 +29,7 @@
     "date": "2026-05-28",
     "items": [
       { "type": "fix", "msg": "AnimeWorld e AnimeSaturn di nuovo operativi (entrambi gli upstream avevano cambiato struttura e i nostri scraper restituivano 0 stream)" },
-      { "type": "fix", "msg": "StreamingCommunity (VixSrc) riattivato: stream HLS con audio italiano nativo per film e serie TV" },
+      { "type": "fix", "msg": "StreamingCommunity riattivato: stream HLS con audio italiano nativo per film e serie TV" },
       { "type": "breaking", "msg": "Profili multipli: ora puoi generare più link in un colpo solo (es. uno per ogni membro della famiglia). Ogni link va installato in un profilo Stremio diverso. Scegli se usare la stessa chiave Torbox per tutti i profili o una chiave diversa per ognuno." },
       { "type": "feat", "msg": "Pagina /changelog con timeline delle novità per data + categoria (Nuovo / Fix / Setup / Perf / Breaking) + banner top per breaking change persistente fino a dismiss" },
       { "type": "feat", "msg": "Logo PEZZOTTIO ufficiale aggiunto al manifest dell'addon" },

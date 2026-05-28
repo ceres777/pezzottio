@@ -11,7 +11,7 @@ const animeunity = require('./providers/animeunity');
 const animeMeta = require('./anime-meta');
 const kitsu = require('./kitsu');
 const vidxgo = require('./providers/vidxgo');
-const vixsrc = require('./providers/vixsrc');
+const streamingcommunity = require('./providers/streamingcommunity');
 const external = require('./providers/external');
 const { findFileForEpisode } = require('./parse');
 
@@ -136,7 +136,7 @@ builder.defineStreamHandler(async ({ type, id }) => {
       return { streams, cacheMaxAge: 5 * 60 };
     }
 
-    // IMDb id per i provider HTTP (VidXgo/VixSrc usano tt direttamente).
+    // IMDb id per i provider HTTP (GuardaSerie/StreamingCommunity usano tt direttamente).
     // Se l'id non è tt ma resolveTitle ha trovato un mapping (es. tmdb:30983 →
     // tt0131179 internamente), proviamo a recuperare l'imdb dal meta originale.
     let imdbId = id.startsWith('tt') ? id.split(':')[0] : null;
@@ -174,7 +174,7 @@ builder.defineStreamHandler(async ({ type, id }) => {
         ? raceTimeout(vidxgo.findStream(imdbId, meta.season, meta.episode, isMovie).catch(() => null), null)
         : Promise.resolve(null),
       (!isAnime && imdbId)
-        ? raceTimeout(vixsrc.findStream(imdbId, meta.season, meta.episode, isMovie).catch(() => null), null)
+        ? raceTimeout(streamingcommunity.findStream(imdbId, meta.season, meta.episode, isMovie).catch(() => null), null)
         : Promise.resolve(null),
       slugsPromise,
     ]);
@@ -276,8 +276,8 @@ builder.defineStreamHandler(async ({ type, id }) => {
         quality: null,
       });
     }
-    // VixSrc: proxy via /hls/sc/* (ripristinato dopo cambi server-side di
-     // vixsrc.to che hanno rotto l'emit diretto del playlist URL).
+    // StreamingCommunity: proxy via /hls/sc/* (ripristinato dopo cambi
+    // server-side dell'upstream che hanno rotto l'emit diretto del playlist URL).
     if (scStream) {
       const s = scStream.isMovie ? 'movie' : scStream.season;
       const e = scStream.isMovie ? 'movie' : scStream.episode;

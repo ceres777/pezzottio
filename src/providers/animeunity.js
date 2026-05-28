@@ -1,4 +1,4 @@
-// AnimeUnity scraper — HLS stream via VixCloud (stesso CDN di VixSrc).
+// AnimeUnity scraper — HLS stream via il loro CDN upstream.
 //
 // Flusso:
 //   1. POST /archivio/get-animes con title → records {id, slug, dub, episodes_count}

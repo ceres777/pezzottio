@@ -1,23 +1,24 @@
-// VixSrc / StreamingCommunity provider.
+// StreamingCommunity provider.
 //
 // Flusso:
 //   1. IMDB → TMDB via api.themoviedb.org/find
-//   2. GET vixsrc.to/api/{movie|tv}/{tmdb}[/{s}/{e}] → JSON {src: "/embed/EID?token=..."}
-//   3. GET vixsrc.to{src} (con Referer) → HTML con window.masterPlaylist {params:{token,expires},url}
+//   2. GET upstream/api/{movie|tv}/{tmdb}[/{s}/{e}] → JSON {src: "/embed/EID?token=..."}
+//   3. GET upstream{src} (con Referer) → HTML con window.masterPlaylist {params:{token,expires},url}
 //   4. Compongo URL playlist: {url}?token=...&expires=...[&h=1]
 //   5. Stremio si connette via il nostro proxy HLS (/hls/sc/...) per token refresh.
 //
-// VixSrc serve audio italiano nativamente (a differenza di VidXgo).
+// Serve audio italiano nativamente (a differenza di VidXgo / GuardaSerie).
 // Master playlist scade ~5 min: il proxy rinnova rifacendo il flusso /api → /embed.
 
 const fetch = require('node-fetch');
 
-const VIXSRC_DOMAIN = 'https://vixsrc.to';
-// Proxy CF Worker per bypassare il blocco CF di vixsrc.to sugli IP datacenter.
+const SC_DOMAIN = 'https://vixsrc.to';
+// Proxy CF Worker opzionale per bypassare blocchi CF sull'upstream da IP datacenter.
 // Se settato, tutte le chiamate /api, /embed, /playlist passano dal Worker.
-// I segment veri (sc-uN-XX.vix-content.net) restano diretti, non bloccati.
-const VIXSRC_PROXY = (process.env.VIXSRC_PROXY || '').replace(/\/$/, '');
-const VIXSRC_BASE = VIXSRC_PROXY || VIXSRC_DOMAIN;
+// I segment veri (CDN edge) restano diretti, non bloccati.
+// Env SC_PROXY è il nome nuovo; fallback al vecchio VIXSRC_PROXY per backward-compat.
+const SC_PROXY = (process.env.SC_PROXY || process.env.VIXSRC_PROXY || '').replace(/\/$/, '');
+const SC_BASE = SC_PROXY || SC_DOMAIN;
 const TMDB_API = 'https://api.themoviedb.org/3';
 // API key pubblica (open-source). Sovrascrivibile via env.
 const TMDB_KEY = process.env.TMDB_API_KEY || '4ef0d7355d9ffb5151e987764708ce96';
@@ -28,16 +29,16 @@ const COMMON_HEADERS = {
   'User-Agent': UA,
   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
   'Accept-Language': 'it-IT,it;q=0.9,en;q=0.8',
-  'Referer': `${VIXSRC_DOMAIN}/`,
+  'Referer': `${SC_DOMAIN}/`,
 };
 
-// Header playback verso il CDN VixSrc (stesso dominio, niente sec-ch-ua richiesti).
+// Header playback verso il CDN upstream (stesso dominio, niente sec-ch-ua richiesti).
 const PLAYBACK_HEADERS = {
   'User-Agent': UA,
   'Accept': '*/*',
   'Accept-Language': 'it-IT,it;q=0.9,en;q=0.8',
-  'Referer': `${VIXSRC_DOMAIN}/`,
-  'Origin': VIXSRC_DOMAIN,
+  'Referer': `${SC_DOMAIN}/`,
+  'Origin': SC_DOMAIN,
 };
 
 // Cache IMDB→TMDB per 24h (mapping stabile)
@@ -58,18 +59,20 @@ async function imdbToTmdb(imdbId, kind) {
   return id;
 }
 
-// Rewrite di un URL host (vixsrc.to / *.vix-content.net) → proxy Worker.
-// Pattern: https://HOST/PATH → ${VIXSRC_PROXY}/HOST/PATH
-// Tutto il flusso passa dal Worker (stesso IP CF) perché vixsrc firma i token
+// Rewrite di un URL host (upstream / *.vix-content.net) → proxy Worker.
+// Pattern: https://HOST/PATH → ${SC_PROXY}/HOST/PATH
+// Tutto il flusso passa dal Worker (stesso IP CF) perché l'upstream firma i token
 // segment usando l'IP che ha fetchato l'embed → mix di IP = 403 sui segment.
 function viaProxy(url) {
-  if (!VIXSRC_PROXY) return url;
+  if (!SC_PROXY) return url;
   const m = url.match(/^https?:\/\/([^/]+)(\/.*)?$/);
   if (!m) return url;
   const host = m[1];
   const rest = m[2] || '/';
-  if (host !== 'vixsrc.to' && !/^sc-u\d+-\d+\.vix-content\.net$/.test(host)) return url;
-  return `${VIXSRC_PROXY}/${host}${rest}`;
+  // Routing solo per host upstream noti (API + CDN segment)
+  const upstreamHost = SC_DOMAIN.replace(/^https?:\/\//, '');
+  if (host !== upstreamHost && !/^sc-u\d+-\d+\.vix-content\.net$/.test(host)) return url;
+  return `${SC_PROXY}/${host}${rest}`;
 }
 
 // 1) Chiama l'API /api per ottenere /embed/EID?token=...&expires=...
@@ -77,13 +80,13 @@ async function getEmbedSrc(tmdbId, season, episode, isMovie) {
   const path = isMovie
     ? `/api/movie/${tmdbId}`
     : `/api/tv/${tmdbId}/${season}/${episode}`;
-  const r = await fetch(`${VIXSRC_BASE}${path}`, {
+  const r = await fetch(`${SC_BASE}${path}`, {
     headers: { ...COMMON_HEADERS, 'Accept': 'application/json,*/*' },
     timeout: 8000,
   });
-  if (!r.ok) throw new Error(`vixsrc api ${path} -> ${r.status}`);
+  if (!r.ok) throw new Error(`sc api ${path} -> ${r.status}`);
   const data = await r.json();
-  if (!data || !data.src) throw new Error('vixsrc api: no src');
+  if (!data || !data.src) throw new Error('sc api: no src');
   return data.src;
 }
 
@@ -91,23 +94,23 @@ async function getEmbedSrc(tmdbId, season, episode, isMovie) {
 async function getPlaylistInfo(tmdbId, season, episode, isMovie) {
   const src = await getEmbedSrc(tmdbId, season, episode, isMovie);
   // src è del tipo "/embed/EID?token=..." — costruisco usando il base (proxy o originale)
-  const embedUrl = src.startsWith('http') ? viaProxy(src) : `${VIXSRC_BASE}${src}`;
+  const embedUrl = src.startsWith('http') ? viaProxy(src) : `${SC_BASE}${src}`;
   const r = await fetch(embedUrl, { headers: COMMON_HEADERS, timeout: 8000 });
-  if (!r.ok) throw new Error(`vixsrc embed -> ${r.status}`);
+  if (!r.ok) throw new Error(`sc embed -> ${r.status}`);
   const html = await r.text();
 
   // Estrae i 3 valori dal blocco window.masterPlaylist = { params: {...}, url: '...' }
   const tokenM = html.match(/['"]token['"]\s*:\s*['"]([^'"]+)['"]/);
   const expiresM = html.match(/['"]expires['"]\s*:\s*['"]([^'"]+)['"]/);
   const urlM = html.match(/window\.masterPlaylist\s*=[\s\S]*?url\s*:\s*['"]([^'"]+)['"]/);
-  if (!tokenM || !expiresM || !urlM) throw new Error('vixsrc: masterPlaylist parse failed');
+  if (!tokenM || !expiresM || !urlM) throw new Error('sc: masterPlaylist parse failed');
 
   const fhdM = html.match(/window\.canPlayFHD\s*=\s*(true|false)/);
   const fhd = fhdM ? fhdM[1] === 'true' : true;
 
-  // VixSrc include "&h=1" per abilitare il rendition 1080p quando disponibile.
-  // La playlist master è ospitata su vixsrc.to → la routing via proxy se attivo
-  // (il CDN segment è su *.vix-content.net, non bloccato, va diretto).
+  // Append "&h=1" per abilitare il rendition 1080p quando disponibile.
+  // La playlist master è sull'upstream → routing via proxy se attivo (il CDN
+  // segment è su edge separato e va comunque diretto, non bloccato).
   const sep = urlM[1].includes('?') ? '&' : '?';
   const rawMaster = `${urlM[1]}${sep}token=${tokenM[1]}&expires=${expiresM[1]}${fhd ? '&h=1' : ''}`;
   const masterUrl = viaProxy(rawMaster);
@@ -132,9 +135,9 @@ async function getMasterUrlCached(tmdbId, season, episode, isMovie) {
 }
 
 async function cdnFetch(url, extraHeaders = {}) {
-  // Le sub-playlist (extracted dal master) referenziano ancora vixsrc.to.
-  // Routing via proxy se configurato (i segment veri vivono su *.vix-content.net
-  // e quelli passano diretti, non bloccati).
+  // Le sub-playlist (extracted dal master) referenziano ancora l'upstream.
+  // Routing via proxy se configurato (i segment veri vivono su CDN edge
+  // separato e quelli passano diretti, non bloccati).
   const finalUrl = viaProxy(url);
   return fetch(finalUrl, {
     headers: { ...PLAYBACK_HEADERS, ...extraHeaders },
@@ -181,7 +184,7 @@ async function findStream(imdbId, season, episode, isMovie) {
     cacheSet(ckey, out);
     return out;
   } catch (e) {
-    console.error('[VixSrc]', e.message);
+    console.error('[SC]', e.message);
     return null;
   }
 }

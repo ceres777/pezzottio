@@ -129,21 +129,26 @@ async function testTorbox(key) {
   }
 }
 
-// === HLS PROXY (VidXgo / GuardaSerie + VixSrc / StreamingCommunity) ===
+// === HLS PROXY (GuardaSerie + StreamingCommunity + AnimeUnity) ===
 // Pezzottio fa da bridge tra Stremio e i CDN dei provider HLS:
 // 1) Stremio chiede master.m3u8 al nostro endpoint
 // 2) Noi fetciamo il CDN con header validi (CDN accetta)
 // 3) Riscriviamo le URL interne del manifest per puntarle al nostro proxy
 // 4) Per ogni segment, ricaviamo URL signed fresh (no TTL stop)
 //
-// Routing: /hls/{vx|sc}/:id/:season/:episode/...
-//   - vx = VidXgo/GuardaSerie (id = imdb number)
-//   - sc = VixSrc/StreamingCommunity (id = tmdb)
+// Routing: /hls/{vx|sc|au}/:id/:season/:episode/...
+//   - vx = GuardaSerie  (id = imdb number)
+//   - sc = StreamingCommunity (id = tmdb)
+//   - au = AnimeUnity (id = anime id upstream)
 const vidxgo = require('./providers/vidxgo');
-const vixsrc = require('./providers/vixsrc');
+const streamingcommunity = require('./providers/streamingcommunity');
 const animeunity = require('./providers/animeunity');
 
-const PROVIDERS = { vx: vidxgo, sc: vixsrc, au: animeunity };
+// Dominio upstream StreamingCommunity. Localizzato qui per non duplicare la
+// stringa in ogni debug endpoint sotto.
+const SC_UPSTREAM = process.env.SC_UPSTREAM || 'https://vixsrc.to';
+
+const PROVIDERS = { vx: vidxgo, sc: streamingcommunity, au: animeunity };
 
 function hlsBase(req) {
   const proto = req.headers['x-forwarded-proto'] || req.protocol;
@@ -559,7 +564,7 @@ app.get('/api/status', async (req, res) => {
     pingHost('AnimeWorld', 'https://www.animeworld.ac/'),
     pingHost('AnimeSaturn', 'https://www.animesaturn.cx/'),
     pingHost('GuardaSerie', 'https://v.vidxgo.co/'),
-    pingHost('StreamingCommunity', 'https://vixsrc.to/'),
+    pingHost('StreamingCommunity', `${SC_UPSTREAM}/`),
     pingHost('Torrentio', 'https://torrentio.strem.fun/manifest.json'),
     pingHost('MediaFusion', 'https://mediafusionfortheweebs.midnightignite.me/'),
     pingHost('Comet', 'https://comet.feels.legal/'),
@@ -577,25 +582,25 @@ app.get('/api/status', async (req, res) => {
   res.json(result);
 });
 
-// Debug VixSrc via cycletls (TLS fingerprint Chrome): testa bypass CF da Render
-app.get('/debug/vixcycle', async (req, res) => {
+// Debug SC via cycletls (TLS fingerprint Chrome): testa bypass CF da datacenter
+app.get('/debug/sccycle', async (req, res) => {
   const out = { steps: [] };
   try {
     const cycleTLS = require('cycletls').default;
     const ct = await cycleTLS();
     const ja3 = '771,4865-4866-4867-49195-49199-49196-49200-52393-52392-49171-49172-156-157-47-53,0-23-65281-10-11-35-16-5-13-18-51-45-43-27-17513,29-23-24,0';
     const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36';
-    const baseOpts = { ja3, userAgent: UA, headers: { 'Referer': 'https://vixsrc.to/' } };
+    const baseOpts = { ja3, userAgent: UA, headers: { 'Referer': `${SC_UPSTREAM}/` } };
 
     const t0 = Date.now();
-    const r1 = await ct('https://vixsrc.to/api/movie/603', { ...baseOpts, headers: { ...baseOpts.headers, 'Accept': 'application/json,*/*' } }, 'GET');
+    const r1 = await ct(`${SC_UPSTREAM}/api/movie/603`, { ...baseOpts, headers: { ...baseOpts.headers, 'Accept': 'application/json,*/*' } }, 'GET');
     const t1 = typeof r1.text === 'function' ? await r1.text() : r1.text;
     out.steps.push({ step: 'api', status: r1.status, ms: Date.now() - t0, preview: String(t1).slice(0, 200) });
 
     if (r1.status === 200) {
       const { src } = JSON.parse(t1);
       const t2start = Date.now();
-      const r2 = await ct('https://vixsrc.to' + src, baseOpts, 'GET');
+      const r2 = await ct(SC_UPSTREAM + src, baseOpts, 'GET');
       const t2 = typeof r2.text === 'function' ? await r2.text() : r2.text;
       out.steps.push({ step: 'embed', status: r2.status, ms: Date.now() - t2start, len: t2.length });
 
@@ -603,7 +608,7 @@ app.get('/debug/vixcycle', async (req, res) => {
         const tm = t2.match(/['"]token['"]\s*:\s*['"]([^'"]+)/);
         const xm = t2.match(/['"]expires['"]\s*:\s*['"]([^'"]+)/);
         if (tm && xm) {
-          const masterUrl = 'https://vixsrc.to/playlist/214325?token=' + tm[1] + '&expires=' + xm[1] + '&h=1';
+          const masterUrl = `${SC_UPSTREAM}/playlist/214325?token=${tm[1]}&expires=${xm[1]}&h=1`;
           const t3start = Date.now();
           const r3 = await ct(masterUrl, baseOpts, 'GET');
           const t3 = typeof r3.text === 'function' ? await r3.text() : r3.text;
@@ -637,8 +642,8 @@ app.get('/debug/vixcycle', async (req, res) => {
   res.json(out);
 });
 
-// Debug CDN VixSrc: testa raggiungibilità sc-u*-01.vix-content.net dal server
-app.get('/debug/vixcdn', async (req, res) => {
+// Debug CDN SC: testa raggiungibilità edge CDN dal server
+app.get('/debug/sccdn', async (req, res) => {
   const fetch = require('node-fetch');
   const targets = [
     'https://sc-u16-01.vix-content.net/',
@@ -652,7 +657,7 @@ app.get('/debug/vixcdn', async (req, res) => {
       const r = await fetch(url, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
-          'Referer': 'https://vixsrc.to/',
+          'Referer': `${SC_UPSTREAM}/`,
         },
         timeout: 6000,
       });
@@ -665,9 +670,9 @@ app.get('/debug/vixcdn', async (req, res) => {
   res.json(out);
 });
 
-// Debug VixSrc: testa raggiungibilità API + parse embed dal server.
-// Es. https://pezz8io.dpdns.org/debug/vixsrc?tmdb=603 (Matrix movie)
-app.get('/debug/vixsrc', async (req, res) => {
+// Debug SC: testa raggiungibilità API + parse embed dal server.
+// Es. /debug/sc?tmdb=603 (Matrix movie)
+app.get('/debug/sc', async (req, res) => {
   const fetch = require('node-fetch');
   const tmdb = req.query.tmdb || '603';
   const isMovie = req.query.tv !== '1';
@@ -675,12 +680,12 @@ app.get('/debug/vixsrc', async (req, res) => {
   const e = req.query.e || '1';
   const out = { tmdb, isMovie, steps: [] };
   try {
-    const apiUrl = isMovie ? `https://vixsrc.to/api/movie/${tmdb}` : `https://vixsrc.to/api/tv/${tmdb}/${s}/${e}`;
+    const apiUrl = isMovie ? `${SC_UPSTREAM}/api/movie/${tmdb}` : `${SC_UPSTREAM}/api/tv/${tmdb}/${s}/${e}`;
     const t0 = Date.now();
     const r = await fetch(apiUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
-        'Referer': 'https://vixsrc.to/',
+        'Referer': `${SC_UPSTREAM}/`,
         'Accept': 'application/json,*/*',
       },
       timeout: 8000,
@@ -691,12 +696,12 @@ app.get('/debug/vixsrc', async (req, res) => {
       try {
         const j = JSON.parse(body);
         if (j.src) {
-          const embedUrl = j.src.startsWith('http') ? j.src : `https://vixsrc.to${j.src}`;
+          const embedUrl = j.src.startsWith('http') ? j.src : `${SC_UPSTREAM}${j.src}`;
           const t1 = Date.now();
           const r2 = await fetch(embedUrl, {
             headers: {
               'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
-              'Referer': 'https://vixsrc.to/',
+              'Referer': `${SC_UPSTREAM}/`,
               'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             },
             timeout: 8000,
