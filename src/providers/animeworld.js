@@ -319,4 +319,42 @@ async function findStreams(title, season, episode, absoluteEpisode, aliases = []
   }
 }
 
-module.exports = { findStreams };
+// Resolve diretto da slug noto (skippa search). Usato dall'endpoint lazy
+// /resolve/aw/{slugEnc}/{ep} che viene chiamato AL CLICK utente (non a /stream).
+// Ritorna { url, referer } o null. Cache 30 min interna.
+const _resolveCache = new Map();
+const _RESOLVE_TTL = 30 * 60 * 1000;
+async function resolveBySlug(slug, episode, absoluteEpisode) {
+  const ckey = `${slug}:${episode}:${absoluteEpisode || ''}`;
+  const hit = _resolveCache.get(ckey);
+  if (hit && Date.now() - hit.t < _RESOLVE_TTL) return hit.v;
+  try {
+    const base = await getBase();
+    const { html: playHtml } = await awFetch(`/play/${slug}`);
+    let token = findEpisodeToken(playHtml, episode);
+    if (!token && absoluteEpisode) token = findEpisodeToken(playHtml, absoluteEpisode);
+    if (!token) return null;
+    const apiUrl = `${base}/api/episode/serverPlayerAnimeWorld?id=${token}`;
+    const apiRes = await fetch(apiUrl, {
+      headers: {
+        'user-agent': UA,
+        'accept-language': 'it-IT,it;q=0.9,en;q=0.8',
+        'x-requested-with': 'XMLHttpRequest',
+        'referer': `${base}/play/${slug}/${token}`,
+      },
+      timeout: TIMEOUT,
+    });
+    if (!apiRes.ok) return null;
+    const epHtml = await apiRes.text();
+    const mp4 = extractMp4(epHtml);
+    if (!mp4) return null;
+    const v = { url: mp4, referer: `${base}/play/${slug}` };
+    _resolveCache.set(ckey, { v, t: Date.now() });
+    return v;
+  } catch (e) {
+    console.error('[AnimeWorld resolveBySlug]', e.message);
+    return null;
+  }
+}
+
+module.exports = { findStreams, resolveBySlug };

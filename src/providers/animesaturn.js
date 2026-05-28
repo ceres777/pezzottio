@@ -308,4 +308,32 @@ async function findStreams(title, season, episode, absoluteEpisode, aliases = []
   }
 }
 
-module.exports = { findStreams };
+// Resolve diretto da slug noto (skippa search). Usato dall'endpoint lazy
+// /resolve/as/{slugEnc}/{ep} chiamato AL CLICK utente. Cache 30 min.
+const _resolveCache = new Map();
+const _RESOLVE_TTL = 30 * 60 * 1000;
+async function resolveBySlug(slug, episode, absoluteEpisode) {
+  const ckey = `${slug}:${episode}:${absoluteEpisode || ''}`;
+  const hit = _resolveCache.get(ckey);
+  if (hit && Date.now() - hit.t < _RESOLVE_TTL) return hit.v;
+  try {
+    const { html: animeHtml } = await asFetch(`/anime/${slug}`);
+    let epUrl = findEpisodeUrl(animeHtml, episode);
+    if (!epUrl && absoluteEpisode) epUrl = findEpisodeUrl(animeHtml, absoluteEpisode);
+    if (!epUrl) return null;
+    const { html: epHtml } = await asFetch(epUrl);
+    const watchUrl = findWatchUrl(epHtml);
+    if (!watchUrl) return null;
+    const { html: watchHtml } = await asFetch(watchUrl);
+    const stream = extractStreamUrl(watchHtml);
+    if (!stream) return null;
+    const v = { url: stream.url, referer: watchUrl, kind: stream.kind };
+    _resolveCache.set(ckey, { v, t: Date.now() });
+    return v;
+  } catch (e) {
+    console.error('[AnimeSaturn resolveBySlug]', e.message);
+    return null;
+  }
+}
+
+module.exports = { findStreams, resolveBySlug };

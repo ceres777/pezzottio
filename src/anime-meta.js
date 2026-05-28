@@ -165,28 +165,35 @@ async function fetchProviderSlugs(idSource, idValue) {
 }
 
 // Lookup unificato: prova tutti gli ID disponibili (kitsu/mal/anilist/imdb/tmdb)
+// in PARALLELO, ritorna il primo non-null. Prima era sequenziale (kitsu→mal→...),
+// con latenza fino a 5×TIMEOUT se i primi ID rispondevano 404. Parallelo:
+// ~1×TIMEOUT, taglia 2-3s sul cold path per anime.
 async function getProviderSlugs({ kitsuId, malId, anilistId, imdbId, tmdbId }) {
-  if (kitsuId) {
-    const r = await fetchProviderSlugs('kitsu', kitsuId);
-    if (r) return r;
-  }
-  if (malId) {
-    const r = await fetchProviderSlugs('mal', malId);
-    if (r) return r;
-  }
-  if (anilistId) {
-    const r = await fetchProviderSlugs('anilist', anilistId);
-    if (r) return r;
-  }
-  if (imdbId) {
-    const r = await fetchProviderSlugs('imdb', imdbId);
-    if (r) return r;
-  }
-  if (tmdbId) {
-    const r = await fetchProviderSlugs('tmdb', tmdbId);
-    if (r) return r;
-  }
-  return null;
+  const sources = [];
+  if (kitsuId) sources.push(['kitsu', kitsuId]);
+  if (malId) sources.push(['mal', malId]);
+  if (anilistId) sources.push(['anilist', anilistId]);
+  if (imdbId) sources.push(['imdb', imdbId]);
+  if (tmdbId) sources.push(['tmdb', tmdbId]);
+  if (!sources.length) return null;
+  // Lancia tutte le richieste in parallelo. Ritorna la PRIMA che risponde
+  // con dati validi (mappings non-null). Promise.any non disponibile su Node
+  // vecchi → emulo con race + filtro null.
+  return new Promise((resolve) => {
+    let pending = sources.length;
+    let resolved = false;
+    for (const [src, id] of sources) {
+      fetchProviderSlugs(src, id).then((r) => {
+        if (resolved) return;
+        pending--;
+        if (r) { resolved = true; resolve(r); return; }
+        if (pending === 0 && !resolved) { resolved = true; resolve(null); }
+      }).catch(() => {
+        pending--;
+        if (pending === 0 && !resolved) { resolved = true; resolve(null); }
+      });
+    }
+  });
 }
 
 // Sceglie il slug "migliore" da una lista: preferisce audio italiano (-ita),

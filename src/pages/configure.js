@@ -1,4 +1,4 @@
-function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta, prefetch }) {
+function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta, prefetch, httpAnime }) {
   const ord = order || 'smart';
   // Backward compat: aios:true legacy → style='aios'
   const st = style || (aios === true || aios === 'true' ? 'aios' : 'pezzottio');
@@ -7,6 +7,8 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
   if (onlyTorrent === true || onlyTorrent === 'true') flt = 'torrent';
   const ita = fullIta === true || fullIta === 'true';
   const pf = prefetch === true || prefetch === 'true';
+  // Default ON: anime abilitato (catalogo Pezzottio Anime + stream HTTP AW/AS/AU)
+  const animeOn = !(httpAnime === false || httpAnime === 'false');
   const hostOnly = String(base || '').replace(/^https?:\/\//i, '');
   const version = require('../../package.json').version;
   return /* html */ `<!DOCTYPE html>
@@ -313,6 +315,19 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
           Stream HTTP diretti + Torbox. <strong class="text-white">Una sola installazione</strong>,
           tutto in italiano.
         </p>
+
+        <!-- LIVE USAGE — fetched ogni 60s da /api/usage -->
+        <div id="live-usage" class="hidden mb-8 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+          <div class="inline-flex items-center gap-2 text-zinc-200">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-dot"></span>
+            <span><strong id="live-1h" class="text-white font-bold tabular-nums">—</strong> <span class="text-zinc-400">attivi adesso</span></span>
+          </div>
+          <div class="text-zinc-400">·</div>
+          <div class="text-zinc-200">
+            <strong id="live-24h" class="text-white font-bold tabular-nums">—</strong> <span class="text-zinc-400">attivi nelle ultime 24h</span>
+          </div>
+        </div>
+
         <div class="flex flex-wrap items-center gap-3">
           <a href="#setup" class="btn-primary inline-flex items-center gap-2 px-7 py-3.5 rounded uppercase text-base">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
@@ -696,36 +711,66 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
       <!-- Filter risultati -->
       <div class="card p-5 mb-3">
         <div class="flex items-center gap-3 mb-3">
-          <div class="text-base">🎯</div>
+          <div class="text-base">🎬</div>
           <div>
-            <div class="font-semibold text-zinc-100 text-sm">Filtra risultati</div>
-            <div class="text-xs text-zinc-500">Quali categorie di stream mostrare in Stremio</div>
+            <div class="font-semibold text-zinc-100 text-sm">Filtra risultati film e serie</div>
+            <div class="text-xs text-zinc-500">Quali categorie mostrare quando apri un film o una serie</div>
           </div>
         </div>
         <div class="space-y-2">
           <label class="flex items-start gap-3 p-3 rounded cursor-pointer hover:bg-white/[0.03] transition border border-transparent">
             <input type="radio" name="filter" value="all" class="mt-1 accent-red-600" ${flt === 'all' ? 'checked' : ''} />
             <div class="flex-1">
-              <div class="text-sm text-white font-medium">Mostra tutto (default)</div>
-              <div class="text-xs text-zinc-400 mt-0.5">Torbox + HTTP italiani + magnet diretti. La lista completa.</div>
+              <div class="text-sm text-white font-medium">Tutto (default)</div>
+              <div class="text-xs text-zinc-400 mt-0.5">Torbox + magnet diretti + HTTP italiani da GuardaSerie e StreamingCommunity.</div>
             </div>
           </label>
           <label class="flex items-start gap-3 p-3 rounded cursor-pointer hover:bg-white/[0.03] transition border border-transparent">
             <input type="radio" name="filter" value="torrent" class="mt-1 accent-red-600" ${flt === 'torrent' ? 'checked' : ''} />
             <div class="flex-1">
               <div class="text-sm text-white font-medium">Solo torrent / Torbox</div>
-              <div class="text-xs text-zinc-400 mt-0.5">Solo i risultati Torbox (+ magnet diretti). Nasconde AnimeWorld, AnimeSaturn, GuardaSerie, StreamingCommunity.</div>
+              <div class="text-xs text-zinc-400 mt-0.5">Solo Torbox (+ magnet diretti). Nasconde GuardaSerie e StreamingCommunity.</div>
             </div>
           </label>
           <label class="flex items-start gap-3 p-3 rounded cursor-pointer hover:bg-white/[0.03] transition border border-transparent">
             <input type="radio" name="filter" value="http" class="mt-1 accent-red-600" ${flt === 'http' ? 'checked' : ''} />
             <div class="flex-1">
               <div class="text-sm text-white font-medium">Solo HTTP italiani</div>
-              <div class="text-xs text-zinc-400 mt-0.5">Solo AnimeWorld, AnimeSaturn, GuardaSerie, StreamingCommunity. Nasconde Torbox e i magnet.</div>
+              <div class="text-xs text-zinc-400 mt-0.5">Solo GuardaSerie + StreamingCommunity. Nasconde Torbox e magnet.</div>
             </div>
           </label>
         </div>
       </div>
+
+      <!-- Filtra risultati ANIME -->
+      <div class="card p-5 mb-3">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="text-base">🎌</div>
+          <div>
+            <div class="font-semibold text-zinc-100 text-sm">Filtra risultati anime</div>
+            <div class="text-xs text-zinc-500">Catalogo Pezzottio Anime + stream HTTP AW/AS/AU</div>
+          </div>
+        </div>
+        <label class="flex items-start gap-3 p-3 rounded cursor-pointer hover:bg-white/[0.03] transition border border-transparent">
+          <input id="anime-toggle" type="checkbox" class="mt-1 accent-red-600 w-4 h-4" ${animeOn ? 'checked' : ''} />
+          <div class="flex-1">
+            <div class="text-sm text-white font-medium">Abilita risultati anime</div>
+            <div class="text-xs text-zinc-400 mt-0.5 leading-relaxed">
+              Aggiunge i cataloghi Pezzottio Anime alla home di Stremio e abilita gli stream HTTP da
+              AnimeWorld, AnimeSaturn e AnimeUnity quando apri un anime dal nostro catalogo.
+            </div>
+          </div>
+        </label>
+        <div class="mt-3 p-3 rounded bg-amber-500/10 border border-amber-500/30">
+          <div class="text-xs text-amber-200 font-semibold mb-1">⚠️ OBBLIGATORIO se attivi l'anime</div>
+          <div class="text-xs text-amber-100/80 leading-relaxed">
+            Disabilita o disinstalla qualsiasi altro catalog anime (Anime Catalogs, Kitsu Anime, Anime
+            Kitsu, AIOCatalogs con sezioni anime). Usano id e numerazioni episodi diversi: causa stream
+            sbagliati o lista vuota.
+          </div>
+        </div>
+      </div>
+
 
       <!-- Full ITA (solo audio italiano) -->
       <div class="card p-5 mb-3">
@@ -816,11 +861,32 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
       <!-- Lista profili multipli (visibile solo in modalità multi-profilo) -->
       <div id="profiles-result" class="hidden space-y-3 mb-6"></div>
 
-      <!-- Install button -->
+      <!-- Step 1: Catalogo extra (consigliato, da installare PRIMA) -->
+      <div class="mb-2 flex items-center gap-2">
+        <span class="flex items-center justify-center w-5 h-5 rounded-full bg-violet-500/20 border border-violet-500/40 text-[10px] font-bold text-violet-300">1</span>
+        <span class="text-xs text-zinc-300">Installa <strong class="text-white">prima</strong> il catalogo</span>
+      </div>
+      <a id="install-catalog" href="stremio://_REPLACED_BY_JS_/extra/manifest.json"
+         class="block text-center w-full px-5 py-3 rounded uppercase mb-1 text-sm font-semibold text-white transition hover:opacity-90"
+         style="background: linear-gradient(135deg, #8b5cf6, #6d28d9);">
+        <span class="inline-flex items-center gap-2 justify-center">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          Installa Catalogo
+        </span>
+      </a>
+      <div class="text-[11px] text-zinc-500 mb-4 ml-7 leading-relaxed">
+        Netflix, Prime Video, Disney+, HBO Max, Apple TV+, Crunchyroll. Gratis.
+      </div>
+
+      <!-- Step 2: Pezzottio (DOPO il catalogo) -->
+      <div class="mb-2 flex items-center gap-2">
+        <span class="flex items-center justify-center w-5 h-5 rounded-full bg-red-500/20 border border-red-500/40 text-[10px] font-bold text-red-300">2</span>
+        <span class="text-xs text-zinc-300"><strong class="text-white">Poi</strong> installa Pezzottio</span>
+      </div>
       <a id="install-stremio" href="#" class="btn-stremio block text-center w-full px-5 py-3.5 rounded uppercase mb-2">
         <span class="inline-flex items-center gap-2 justify-center">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-          Installa in Stremio
+          Installa Pezzottio
         </span>
       </a>
       <button id="copy-url" class="btn-ghost w-full px-5 py-2.5 rounded text-sm mb-6">
@@ -1056,6 +1122,26 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
     }
     loadLastUpdate();
 
+    // Live usage counter: fetch /api/usage, mostra "attivi adesso" e "ultime 24h".
+    // Refresh ogni 60s. Endpoint può non esistere (es. cache.local.js non caricato)
+    // → hidden silente.
+    async function loadUsage() {
+      try {
+        const r = await fetch('/api/usage', { cache: 'no-store' });
+        if (!r.ok) return;
+        const d = await r.json();
+        if (typeof d.active1h !== 'number' || typeof d.active24h !== 'number') return;
+        const box = $('#live-usage');
+        const elH = $('#live-1h');
+        const elD = $('#live-24h');
+        if (elH) elH.textContent = d.active1h.toLocaleString('it-IT');
+        if (elD) elD.textContent = d.active24h.toLocaleString('it-IT');
+        if (box) box.classList.remove('hidden');
+      } catch (_) {}
+    }
+    loadUsage();
+    setInterval(loadUsage, 60_000);
+
     async function loadStatus() {
       try {
         const r = await fetch('/api/status');
@@ -1229,6 +1315,9 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
       if ($('#full-ita-toggle') && $('#full-ita-toggle').checked) payload.fullIta = true;
       // Prefetch opt-in
       if ($('#prefetch-toggle') && $('#prefetch-toggle').checked) payload.prefetch = true;
+      // Anime (default ON): salvo nel link solo se l'utente l'ha disattivato.
+      // httpAnime=false → niente catalogo Pezzottio Anime + niente stream AW/AS/AU.
+      if ($('#anime-toggle') && !$('#anime-toggle').checked) payload.httpAnime = false;
 
       // === MODALITÀ PROFILI MULTIPLI ===
       if (profiles.length > 0) {
@@ -1336,6 +1425,14 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
       b.textContent = '✓ Copiato';
       setTimeout(() => b.textContent = t, 1400);
     });
+
+    // Catalog extra: bottone separato, URL fisso al nostro proxy /extra/.
+    // L'utente clicca PRIMA "Installa Catalogo" (Stremio aggiunge il catalog),
+    // POI clicca "Installa Pezzottio". L'ordine di install determina l'ordine
+    // dei catalog in home Stremio (primo installato = primo in lista).
+    const EXTRA_CATALOG_URL = 'stremio://' + HOST + '/extra/manifest.json';
+    const installCatBtn = $('#install-catalog');
+    if (installCatBtn) installCatBtn.href = EXTRA_CATALOG_URL;
   </script>
 </body>
 </html>`;

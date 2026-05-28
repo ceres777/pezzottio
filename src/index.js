@@ -37,7 +37,7 @@ function publicBase(req) {
 
 // Path noti del SDK / app che NON sono config codificate.
 const KNOWN_PATHS = new Set([
-  'configure', 'api', 'debug', 'play', 'hls', 'dl', 'manifest.json', 'stream', 'meta', 'catalog', 'subtitles',
+  'configure', 'api', 'debug', 'play', 'hls', 'dl', 'resolve', 'extra', 'manifest.json', 'stream', 'meta', 'catalog', 'subtitles',
   'logo.png', 'logo.svg', 'background.png', 'background.svg', 'pezzottio-logo.png',
   'changelog',
 ]);
@@ -85,6 +85,8 @@ app.get('/configure', (req, res) => {
       filter: req.userConfig.filter || null,
       fullIta: req.userConfig.fullIta === true || req.userConfig.fullIta === 'true',
       prefetch: req.userConfig.prefetch === true || req.userConfig.prefetch === 'true',
+      // Default ON. Diventa false solo se l'utente l'ha disattivato esplicitamente.
+      httpAnime: !(req.userConfig.httpAnime === false || req.userConfig.httpAnime === 'false'),
     })
   );
 });
@@ -378,6 +380,36 @@ app.get('/dl/:encUrl', async (req, res) => {
   } catch (e) {
     console.error('[dl] proxy err:', e.message);
     res.status(502).end();
+  }
+});
+
+// Lazy resolve HTTP anime (AW/AS): Stremio chiama questo URL al click "play".
+// Pattern stesso del /play debrid: /stream emette solo placeholder (zero attesa
+// per la chain di fetch), la risoluzione avviene SOLO quando l'utente clicca.
+// 302 redirect alla URL MP4/m3u8 diretta. Slug è base64url-encoded.
+const ANIME_RESOLVERS = {
+  aw: require('./providers/animeworld'),
+  as: require('./providers/animesaturn'),
+};
+app.get('/resolve/:prov/:slugEnc/:episode', async (req, res) => {
+  const prov = req.params.prov;
+  const resolver = ANIME_RESOLVERS[prov];
+  if (!resolver || !resolver.resolveBySlug) return res.status(404).send('unknown provider');
+  try {
+    const slug = Buffer.from(req.params.slugEnc, 'base64url').toString('utf8');
+    const episode = Number(req.params.episode);
+    const absoluteEpisode = req.query.abs ? Number(req.query.abs) : null;
+    const t0 = Date.now();
+    const r = await resolver.resolveBySlug(slug, episode, absoluteEpisode);
+    if (!r || !r.url) {
+      console.log(`[resolve] ${prov} ${slug} ep${episode} -> NOT FOUND (${Date.now() - t0}ms)`);
+      return res.status(404).send('stream not found');
+    }
+    console.log(`[resolve] ${prov} ${slug} ep${episode} -> ${r.url.slice(0, 80)} (${Date.now() - t0}ms)`);
+    return res.redirect(302, r.url);
+  } catch (e) {
+    console.error('[resolve]', prov, e.message);
+    return res.status(502).send('resolve failed');
   }
 });
 
@@ -1136,6 +1168,97 @@ app.get('/debug/corsaro', async (req, res) => {
 
 // Root → /configure
 app.get('/', (req, res) => res.redirect('/configure'));
+
+// === EXTRA CATALOG PROXY (/extra/*) ===
+// Proxy completo verso un addon di metadata esterno preconfigurato.
+// Lo serviamo sotto il nostro dominio con branding "Pezzottio Extra" così
+// l'utente non vede il nome dell'addon upstream nel dialog Stremio.
+// Solo manifest viene riscritto (id + name); catalog/meta/subtitles sono
+// passthrough con caching aggressivo.
+const EXTRA_UPSTREAM = process.env.EXTRA_CATALOG_UPSTREAM
+  || 'https://aiometadata.elfhosted.com/stremio/3bfc4ec0-ef9d-4703-98ca-ab313631d178';
+
+const _extraCache = new Map();
+function _extraTtl(path) {
+  if (/manifest\.json$/.test(path)) return 5 * 60 * 1000;        // 5min
+  if (/^\/meta\//.test(path)) return 6 * 60 * 60 * 1000;          // 6h
+  if (/^\/catalog\//.test(path)) return 60 * 60 * 1000;           // 1h
+  if (/^\/subtitles\//.test(path)) return 60 * 60 * 1000;         // 1h
+  return 10 * 60 * 1000;                                          // default
+}
+
+async function _fetchExtra(subpath) {
+  const ckey = subpath;
+  const ttl = _extraTtl(subpath);
+  const hit = _extraCache.get(ckey);
+  if (hit && Date.now() - hit.t < ttl) return hit;
+  try {
+    const r = await fetch(`${EXTRA_UPSTREAM}${subpath}`, {
+      timeout: 8000,
+      headers: { 'Accept': 'application/json', 'User-Agent': 'Pezzottio-Proxy/1.0' },
+    });
+    const body = await r.text();
+    const entry = { body, status: r.status, t: Date.now() };
+    if (r.ok) _extraCache.set(ckey, entry);
+    return entry;
+  } catch (e) {
+    console.error('[extra-proxy]', subpath, e.message);
+    return { body: '{"err":"upstream"}', status: 502, t: Date.now() };
+  }
+}
+
+app.get(/^\/extra(\/.*)?$/, async (req, res) => {
+  const subpath = (req.params[0] || '/').split('?')[0];
+  // Manifest: rebrand
+  if (subpath === '/manifest.json' || subpath === '/') {
+    const r = await _fetchExtra('/manifest.json');
+    if (r.status >= 400) return res.status(r.status).type('application/json').send(r.body);
+    try {
+      const m = JSON.parse(r.body);
+      m.id = 'org.pezzottio.extracatalogs';
+      m.name = 'Pezzottio Extra';
+      m.description = 'Catalog Netflix, Prime Video, Disney+, HBO Max, Apple TV+, Crunchyroll integrato in Pezzottio.';
+      m.logo = `${publicBase(req)}/logo.png`;
+      if (m.behaviorHints) {
+        delete m.behaviorHints.configurable;
+        delete m.behaviorHints.configurationRequired;
+      }
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Cache-Control', 'max-age=300, public');
+      return res.send(JSON.stringify(m));
+    } catch (e) {
+      return res.status(502).json({ err: 'manifest parse failed' });
+    }
+  }
+  // Tutto il resto: passthrough
+  const r = await _fetchExtra(subpath);
+  res.status(r.status || 200);
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Cache-Control', `max-age=${Math.floor(_extraTtl(subpath) / 1000)}, public`);
+  res.send(r.body);
+});
+
+// Manifest dinamico: rimuove i cataloghi Pezzottio Anime se l'utente ha
+// disabilitato l'anime nella sua config (httpAnime=false). Catalogo e stream
+// HTTP anime vanno insieme — se uno è off, l'altro pure. Questo middleware
+// deve girare PRIMA del SDK router (che serve il manifest statico).
+app.get(/^\/manifest\.json$/, (req, res, next) => serveManifest(req, res, next));
+function serveManifest(req, res) {
+  try {
+    const animeOff = req.userConfig?.httpAnime === false || req.userConfig?.httpAnime === 'false';
+    // Clone shallow del manifest. Filtra catalogs se anime off.
+    const m = { ...addonInterface.manifest };
+    if (animeOff && Array.isArray(m.catalogs)) {
+      m.catalogs = m.catalogs.filter((c) => !c.id.startsWith('pezzottio-anime-'));
+    }
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'max-age=300, public');
+    res.send(JSON.stringify(m));
+  } catch (e) {
+    console.error('[manifest]', e.message);
+    res.status(500).send('manifest error');
+  }
+}
 
 // Tutto il resto va all'SDK router, dentro un contesto ALS con la config dell'utente.
 const sdkRouter = getRouter(addonInterface);

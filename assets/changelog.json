@@ -1,5 +1,18 @@
 [
   {
+    "date": "2026-05-30",
+    "items": [
+      { "type": "feat", "msg": "Catalogo anime integrato (Kitsu): 5 sezioni in home — Pezzottio Anime / In Onda / Più Popolari / Top Rated / Nuovi. Search anime via Kitsu, metadata completi (lista episodi con thumbnail, voti, generi). Niente più dipendenza da addon esterni." },
+      { "type": "feat", "msg": "Catalogo extra opzionale 'Pezzottio Extra' (Netflix, Prime Video, Disney+, HBO Max, Apple TV+, Crunchyroll, Paramount+ e altre). Si installa con un click dalla pagina /configure insieme a Pezzottio." },
+      { "type": "perf", "msg": "Stream HTTP anime con lazy URL pattern: /stream apre in 2-3 secondi invece di 8. La risoluzione AnimeWorld/AnimeSaturn avviene SOLO al click utente, niente attese sull'apertura della lista." },
+      { "type": "config", "msg": "Sezione 'Filtra risultati anime' separata da film e serie. Una spunta unica abilita catalogo Kitsu + stream HTTP AW/AS/AU insieme. Warning chiaro: obbligatorio disabilitare altri catalog anime (Anime Catalogs, Kitsu Anime, AIOCatalogs con sezioni anime) per evitare conflitti di id." },
+      { "type": "config", "msg": "Sezione 'Filtra risultati film e serie' indipendente dall'anime: 3 modalità (Tutto / Solo torrent-Torbox / Solo HTTP italiani da GuardaSerie + StreamingCommunity)." },
+      { "type": "feat", "msg": "Pagina /configure: due bottoni install separati (prima il catalogo, poi Pezzottio) per ordine ottimale dei cataloghi nella home Stremio." },
+      { "type": "feat", "msg": "Indicatore utenti attivi in tempo reale nella hero della pagina configure (refresh ogni 60s)." },
+      { "type": "fix", "msg": "Search globale Stremio ora trova gli anime: catalog search registrato anche su type series e movie (Stremio non cerca nei catalog 'anime' dalla barra globale)." }
+    ]
+  },
+  {
     "date": "2026-05-29",
     "items": [
       { "type": "feat", "msg": "Nuovo provider HTTP: AnimeUnity. Ora ci sono 3 fonti italiane per anime in parallelo (AnimeWorld + AnimeSaturn + AnimeUnity), con audio italiano nativo dove disponibile" },

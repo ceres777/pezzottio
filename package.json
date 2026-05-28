@@ -1,6 +1,6 @@
 {
   "name": "pezzottio-stremio-addon",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Stremio addon: torrent search + RealDebrid/Torbox",
   "main": "src/index.js",
   "type": "commonjs",

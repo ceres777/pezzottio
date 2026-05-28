@@ -64,14 +64,14 @@ async function resolveTitle(type, id) {
   if (!r) return null;
   const { meta, sourceIds } = r;
   if (!meta) return null;
-  // Arricchimento finale: per gli anime cerco i slug AW/AS/AU direttamente
-  // via animemapping.realbestia.com con TUTTI gli ID disponibili (kitsu/mal/
-  // anilist/imdb/tmdb/tvdb/anidb). Bypassa search dinamica nei provider.
+  // Arricchimento per anime: lookup slug AW/AS/AU via animemapping.realbestia.com
+  // Fire-and-forget: kick off la richiesta ma NON aspettiamo. Il chiamante
+  // (addon.js) ottiene la Promise e la awaita in parallelo con altre fetch
+  // così resolveTitle non blocca per 2-3s ogni /stream di anime.
   if (meta.type === 'anime') {
-    try {
-      const slugs = await animeMeta.getProviderSlugs(sourceIds || {});
-      if (slugs) meta.providerSlugs = slugs;
-    } catch (_) {}
+    meta.providerSlugsPromise = animeMeta.getProviderSlugs(sourceIds || {})
+      .then((slugs) => { if (slugs) meta.providerSlugs = slugs; return slugs; })
+      .catch(() => null);
   }
   return meta;
 }

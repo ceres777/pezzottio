@@ -8,12 +8,24 @@ const debrid = require('./debrid');
 const animeworld = require('./providers/animeworld');
 const animesaturn = require('./providers/animesaturn');
 const animeunity = require('./providers/animeunity');
+const animeMeta = require('./anime-meta');
+const kitsu = require('./kitsu');
 const vidxgo = require('./providers/vidxgo');
 const vixsrc = require('./providers/vixsrc');
 const external = require('./providers/external');
 const { findFileForEpisode } = require('./parse');
 
 const PUBLIC_HOST = process.env.PUBLIC_HOST || 'https://pezz8io.dpdns.org';
+
+// Generi Kitsu (selezione: i più usati). Permette filter dropdown in Stremio.
+const KITSU_GENRES = [
+  'Action', 'Adventure', 'Comedy', 'Drama', 'Sci-Fi', 'Mystery', 'Magic',
+  'Supernatural', 'Fantasy', 'Romance', 'Horror', 'Psychological', 'Thriller',
+  'Martial Arts', 'School', 'Sports', 'Historical', 'Mecha', 'Music',
+  'Slice of Life', 'Ecchi', 'Harem', 'Demons', 'Samurai', 'Game', 'Police',
+  'Military', 'Vampire',
+];
+
 const manifest = {
   id: 'org.pezzottio.addon',
   version: require('../package.json').version,
@@ -21,13 +33,76 @@ const manifest = {
   description: 'Lo streaming italiano senza menate. Cerca film, serie e anime su 30+ tracker e mette sempre in cima l\'audio italiano. Integrazione con Torbox per riproduzione istantanea. Proxy HLS integrato server-side: niente MediaFlowProxy, niente Docker, niente VPS da configurare. Setup in 30 secondi.',
   logo: `${PUBLIC_HOST}/logo.png`,
   background: `${PUBLIC_HOST}/background.png`,
-  resources: ['stream'],
-  types: ['movie', 'series'],
+  resources: ['stream', 'catalog', 'meta'],
+  types: ['movie', 'series', 'anime'],
   // Tutti i prefissi id che gestiamo. Per quelli non-Stremio (mal/anilist/tmdb/tvdb/cr)
   // cinemeta.js mappa via api.ani.zip → kitsu o imdb prima di proseguire.
   // Per cr: e id sconosciuti, l'addon prova comunque a chiedere agli external addon.
   idPrefixes: ['tt', 'kitsu', 'mal', 'anilist', 'anidb', 'tmdb', 'themoviedb', 'tvdb', 'thetvdb', 'cr', 'crunchyroll'],
-  catalogs: [],
+  // Cataloghi anime backed da Kitsu API. Search via filter[text]= con relevance
+  // sort lato Kitsu. Metadata (lista episodi) proxata a anime-kitsu.strem.fun.
+  catalogs: [
+    // Search catalog DUPLICATO su 3 type: anime/series/movie.
+    // Stremio invoca la ricerca globale SOLO sui catalog di type 'movie' o
+    // 'series' — i catalog 'anime' sono ignorati dalla search bar (vengono
+    // mostrati solo in browse). Per essere trovabili da "cerca naruto" servono
+    // anche le varianti series + movie. Il handler filtra i meta per type
+    // così ogni catalog ritorna solo gli anime del suo tipo.
+    {
+      id: 'pezzottio-anime-search',
+      type: 'anime',
+      name: 'Pezzottio Anime',
+      extra: [{ name: 'search', isRequired: true }],
+    },
+    {
+      id: 'pezzottio-anime-search-series',
+      type: 'series',
+      name: 'Pezzottio Anime',
+      extra: [{ name: 'search', isRequired: true }],
+    },
+    {
+      id: 'pezzottio-anime-search-movie',
+      type: 'movie',
+      name: 'Pezzottio Anime',
+      extra: [{ name: 'search', isRequired: true }],
+    },
+    {
+      id: 'pezzottio-anime-airing',
+      type: 'anime',
+      name: 'Pezzottio Anime — In Onda',
+      extra: [
+        { name: 'genre', options: KITSU_GENRES, isRequired: false },
+        { name: 'skip', isRequired: false },
+      ],
+    },
+    {
+      id: 'pezzottio-anime-popular',
+      type: 'anime',
+      name: 'Pezzottio Anime — Più Popolari',
+      extra: [
+        { name: 'genre', options: KITSU_GENRES, isRequired: false },
+        { name: 'skip', isRequired: false },
+      ],
+    },
+    {
+      id: 'pezzottio-anime-rating',
+      type: 'anime',
+      name: 'Pezzottio Anime — Top Rated',
+      extra: [
+        { name: 'genre', options: KITSU_GENRES, isRequired: false },
+        { name: 'skip', isRequired: false },
+      ],
+    },
+    {
+      id: 'pezzottio-anime-newest',
+      type: 'anime',
+      name: 'Pezzottio Anime — Nuovi',
+      extra: [
+        { name: 'genre', options: KITSU_GENRES, isRequired: false },
+        { name: 'skip', isRequired: false },
+      ],
+    },
+  ],
   behaviorHints: { configurable: true, configurationRequired: false },
   // Claim ownership su stremio-addons.net
   stremioAddonsConfig: {
@@ -71,37 +146,120 @@ builder.defineStreamHandler(async ({ type, id }) => {
     const isMovie = type === 'movie';
     const httpProviderArgs = [meta.title, meta.season, meta.episode, meta.absoluteEpisode, meta.animeAliases || [], meta.imdbId || imdbId, meta.providerSlugs];
 
-    // Master timeout per ogni fetch. Differenziato per tipo:
-    //  - movie/series: 2000ms (aggregator ext <400ms, scraper interni <1.5s,
-    //    VixSrc/VidXgo ~1.5s) → cap stretto, zero perdita di risultati
-    //  - anime: 3000ms (TokyoTosho può prendersi 2.6s)
+    // Master timeout per ogni fetch. 2-3s per TUTTO. Per anime gli stream HTTP
+    // arrivano come "lazy URL placeholder" (vedi sotto): zero attesa per la
+    // chain di fetch, la risoluzione avviene SOLO al click utente su /resolve.
     const CAP_MS = isAnime ? 3000 : 2000;
     const raceTimeout = (p, def) => Promise.race([
       p,
       new Promise((r) => setTimeout(() => r(def), CAP_MS)),
     ]);
 
-    const [torrentsRaw, awStreams, asStreams, auStreams, vxStream, scStream, externalStreams] = await Promise.all([
+    // providerSlugsPromise è kick-startato in resolveTitle ma non awaited
+    // (fire-and-forget): lo awaiteremo in parallelo con torrent/external/etc.
+    // Cap 2.5s sul wait: se animemapping è lento, falliamo open (= fallback
+    // a findStreams classico per i provider mancanti).
+    const slugsPromise = isAnime
+      ? Promise.race([
+          meta.providerSlugsPromise || Promise.resolve(null),
+          new Promise((r) => setTimeout(() => r(null), 2500)),
+        ]).then((s) => s || meta.providerSlugs || null)
+      : Promise.resolve(null);
+
+    // Risultati paralleli: torrent + external + slugs animemapping
+    const [torrentsRaw, externalStreams, vxStream, scStream, slugsResult] = await Promise.all([
       raceTimeout(searchTorrents(meta, type, imdbId), []),
-      isAnime ? raceTimeout(animeworld.findStreams(...httpProviderArgs).catch(() => []), []) : Promise.resolve([]),
-      isAnime ? raceTimeout(animesaturn.findStreams(...httpProviderArgs).catch(() => []), []) : Promise.resolve([]),
-      isAnime ? raceTimeout(animeunity.findStreams(...httpProviderArgs).catch(() => []), []) : Promise.resolve([]),
+      raceTimeout(external.searchExternal(type, fullStremioId).catch(() => []), []),
       (!isAnime && imdbId)
         ? raceTimeout(vidxgo.findStream(imdbId, meta.season, meta.episode, isMovie).catch(() => null), null)
         : Promise.resolve(null),
       (!isAnime && imdbId)
         ? raceTimeout(vixsrc.findStream(imdbId, meta.season, meta.episode, isMovie).catch(() => null), null)
         : Promise.resolve(null),
-      // Torrentio + proxy community IT (capiscono i loro id nativi).
-      raceTimeout(external.searchExternal(type, fullStremioId).catch(() => []), []),
+      slugsPromise,
     ]);
+
     const publicHost = process.env.PUBLIC_HOST || `http://${getConfig().host}:${getConfig().port}`;
-    // AU usa il proxy /hls/au/* (token IP-bound sui segment).
-    const auStreamsProxied = auStreams.map((s) => ({
-      ...s,
-      url: `${publicHost}/hls/au/${s.animeId}/1/${s.episodeNum}/master.m3u8`,
-    }));
-    const httpStreams = [...awStreams, ...asStreams, ...auStreamsProxied];
+    const httpStreams = [];
+
+    // === LAZY HTTP STREAMS (anime) ===
+    // Se animemapping conosce gli slug AW/AS/AU per questo anime, emetto
+    // placeholder INSTANT (zero chain di fetch). La URL è il nostro endpoint
+    // /resolve/{prov}/... che fa la chain solo AL CLICK dell'utente.
+    // Per AU usiamo la URL diretta /hls/au/* (già lazy via proxy HLS).
+    const ranked = {
+      aw: (slugsResult && slugsResult.aw) ? animeMeta.rankSlugs(slugsResult.aw) : [],
+      as: (slugsResult && slugsResult.as) ? animeMeta.rankSlugs(slugsResult.as) : [],
+      au: (slugsResult && slugsResult.au) ? animeMeta.rankSlugs(slugsResult.au) : [],
+    };
+    const epNum = meta.episode || meta.absoluteEpisode;
+    const absParam = meta.absoluteEpisode ? `?abs=${meta.absoluteEpisode}` : '';
+
+    if (isAnime && ranked.aw.length) {
+      const top = ranked.aw[0]; // /play/SLUG
+      const m = top.match(/^\/play\/(.+)$/);
+      if (m && epNum) {
+        const slugEnc = Buffer.from(m[1], 'utf8').toString('base64url');
+        const isAudioIta = /-ita\b/.test(m[1]);
+        httpStreams.push({
+          provider: 'AW',
+          url: `${publicHost}/resolve/aw/${slugEnc}/${epNum}${absParam}`,
+          italian: isAudioIta,
+          italianSub: !isAudioIta,
+          quality: null,
+        });
+      }
+    }
+    if (isAnime && ranked.as.length) {
+      const top = ranked.as[0]; // /anime/SLUG
+      const m = top.match(/^\/anime\/(.+)$/);
+      if (m && epNum) {
+        const slugEnc = Buffer.from(m[1], 'utf8').toString('base64url');
+        const isAudioIta = /-ita(?:\b|$)/i.test(m[1]);
+        httpStreams.push({
+          provider: 'AS',
+          url: `${publicHost}/resolve/as/${slugEnc}/${epNum}${absParam}`,
+          italian: isAudioIta,
+          italianSub: !isAudioIta,
+          quality: null,
+        });
+      }
+    }
+    if (isAnime && ranked.au.length) {
+      const top = ranked.au[0]; // /anime/ID-SLUG
+      const m = top.match(/^\/anime\/(\d+)-(.+)$/);
+      if (m && epNum) {
+        const auId = m[1];
+        const slug = m[2];
+        const isAudioIta = /-ita$/.test(slug);
+        httpStreams.push({
+          provider: 'AU',
+          url: `${publicHost}/hls/au/${auId}/1/${epNum}/master.m3u8`,
+          italian: isAudioIta,
+          italianSub: !isAudioIta,
+          quality: null,
+        });
+      }
+    }
+
+    // === FALLBACK findStreams (provider SENZA slug in animemapping) ===
+    // Se animemapping non ha lo slug per un provider, fallback al vecchio
+    // findStreams (search dinamica + chain), in parallelo con cap 3s.
+    // Anime NON mappati: tentiamo comunque AW/AS/AU via search.
+    const needFallbackAW = isAnime && !ranked.aw.length;
+    const needFallbackAS = isAnime && !ranked.as.length;
+    const needFallbackAU = isAnime && !ranked.au.length;
+    if (needFallbackAW || needFallbackAS || needFallbackAU) {
+      const [awFb, asFb, auFb] = await Promise.all([
+        needFallbackAW ? raceTimeout(animeworld.findStreams(...httpProviderArgs).catch(() => []), []) : Promise.resolve([]),
+        needFallbackAS ? raceTimeout(animesaturn.findStreams(...httpProviderArgs).catch(() => []), []) : Promise.resolve([]),
+        needFallbackAU ? raceTimeout(animeunity.findStreams(...httpProviderArgs).catch(() => []), []) : Promise.resolve([]),
+      ]);
+      httpStreams.push(...awFb, ...asFb, ...auFb.map((s) => ({
+        ...s,
+        url: `${publicHost}/hls/au/${s.animeId}/1/${s.episodeNum}/master.m3u8`,
+      })));
+    }
     // VidXgo: il CDN ha session/IP pinning sul token (token risolto da IP X
     // funziona solo se richiesto dallo stesso IP). Bypass non praticabile →
     // proxy URL come prima. ~half della banda HLS resta sul server.
@@ -356,17 +514,30 @@ builder.defineStreamHandler(async ({ type, id }) => {
 
       return { name, title, url: s.url, behaviorHints };
     }
-    // Filter mode: 'all' (default) | 'torrent' (no HTTP) | 'http' (no torrent/debrid)
+    // Filter mode è SPECIFICO per film/serie: 'all' | 'torrent' | 'http'.
+    // Per anime invece c'è il toggle dedicato httpAnime (catalogo+HTTP insieme).
     // Backward compat: vecchio onlyTorrent:true → filter='torrent'
     let filterMode = userCfgEarly.filter || 'all';
     if (userCfgEarly.onlyTorrent === true || userCfgEarly.onlyTorrent === 'true') filterMode = 'torrent';
-    const hideHttp = filterMode === 'torrent';
-    const hideTorrent = filterMode === 'http';
-    // Full ITA: mostra solo stream con audio italiano (esclude sub ITA e
-    // release senza marker italiano).
     const fullIta = userCfgEarly.fullIta === true || userCfgEarly.fullIta === 'true';
-    const httpStreamsFiltered = fullIta ? httpStreams.filter((s) => s.italian) : httpStreams;
-    const awFormattedStreams = hideHttp ? [] : httpStreamsFiltered.map(formatHttpStream);
+    const httpAnimeOn = !(userCfgEarly.httpAnime === false || userCfgEarly.httpAnime === 'false');
+
+    const ANIME_PROVS = new Set(['AW', 'AS', 'AU']);
+    const FILM_PROVS = new Set(['GS', 'SC']);
+
+    // Hide flags content-type aware:
+    //  - ANIME:   torrent sempre on, HTTP segue httpAnime, filterMode ignorato
+    //  - FILM/S:  filterMode controlla hideHttp + hideTorrent
+    const hideTorrent = !isAnime && filterMode === 'http';
+    const hideFilmHttp = !isAnime && filterMode === 'torrent';
+
+    let httpStreamsFiltered = fullIta ? httpStreams.filter((s) => s.italian) : httpStreams;
+    httpStreamsFiltered = httpStreamsFiltered.filter((s) => {
+      if (ANIME_PROVS.has(s.provider)) return isAnime && httpAnimeOn;
+      if (FILM_PROVS.has(s.provider)) return !isAnime && !hideFilmHttp;
+      return true;
+    });
+    const awFormattedStreams = httpStreamsFiltered.map(formatHttpStream);
 
     // Senza debrid: magnet diretti + HTTP in cima.
     if (!providers.length) {
@@ -494,6 +665,63 @@ builder.defineStreamHandler(async ({ type, id }) => {
   } catch (err) {
     console.error('[stream handler]', err);
     return { streams: [] };
+  }
+});
+
+// === CATALOG HANDLER ===
+// Cataloghi anime backed da Kitsu API. ID format: pezzottio-anime-<key>.
+// Search: usa il catalog 'pezzottio-anime-search' con extra.search=QUERY.
+// Liste: airing | popular | rating | newest, paginate via extra.skip, filtrate
+// da extra.genre.
+builder.defineCatalogHandler(async ({ type, id, extra }) => {
+  try {
+    const skip = extra?.skip ? Number(extra.skip) : 0;
+    const genre = extra?.genre || null;
+    const search = extra?.search || null;
+
+    let metas = [];
+    const isSearch = id.startsWith('pezzottio-anime-search');
+    if (isSearch) {
+      if (!search) return { metas: [], cacheMaxAge: 60 };
+      metas = await kitsu.search(search, { skip });
+      // Filtra per type richiesto: il catalog di type 'series' deve ritornare
+      // solo anime serie, il 'movie' solo anime film. Il catalog 'anime'
+      // ritorna tutto (per chi naviga il catalog direttamente).
+      if (type === 'series' || type === 'movie') {
+        metas = metas.filter((m) => m.type === type);
+      }
+    } else if (id.startsWith('pezzottio-anime-')) {
+      const key = id.replace('pezzottio-anime-', ''); // airing|popular|rating|newest
+      metas = await kitsu.getCatalog(key, { skip, genre });
+    } else {
+      return { metas: [] };
+    }
+    // Cache: search 1h, liste 4h.
+    const cacheMaxAge = isSearch ? 60 * 60 : 4 * 60 * 60;
+    return { metas, cacheMaxAge, staleRevalidate: 60 * 60, staleError: 24 * 60 * 60 };
+  } catch (err) {
+    console.error('[catalog handler]', err);
+    return { metas: [] };
+  }
+});
+
+// === META HANDLER ===
+// Per i kitsu: ids (provenienti dai nostri cataloghi), proxy a anime-kitsu.strem.fun
+// che restituisce videos[] completi con thumbnail/numero corretti. Cache 24h.
+// Altri prefissi (tt, mal, anilist...) li lasciamo a Cinemeta/altri addon: Stremio
+// li chiamerà comunque in parallelo e prenderà la prima risposta utile.
+builder.defineMetaHandler(async ({ type, id }) => {
+  try {
+    if (id && id.startsWith('kitsu:')) {
+      const data = await kitsu.getMeta(type, id);
+      if (data && data.meta) {
+        return { meta: data.meta, cacheMaxAge: 24 * 60 * 60, staleRevalidate: 6 * 60 * 60, staleError: 7 * 24 * 60 * 60 };
+      }
+    }
+    return { meta: null };
+  } catch (err) {
+    console.error('[meta handler]', err);
+    return { meta: null };
   }
 });
 
