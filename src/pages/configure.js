@@ -305,8 +305,8 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
 
     <!-- HERO SPLIT: text + mockup -->
     <header class="grid lg:grid-cols-[1.1fr_1fr] gap-8 md:gap-12 lg:gap-16 items-center pt-8 pb-12 md:pt-16 md:pb-20">
-      <div>
-        <div class="flex flex-wrap items-center gap-2 mb-5 md:mb-6">
+      <div class="text-center lg:text-left">
+        <div class="flex flex-wrap items-center justify-center lg:justify-start gap-2 mb-5 md:mb-6">
           <div class="trust-badge">
             <span class="dot"></span> 100% gratis · Open source · Privacy first
           </div>
@@ -318,14 +318,14 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
           Tutto lo streaming.<br>
           <span style="color:var(--red)">In italiano.</span>
         </h1>
-        <p class="text-zinc-300 text-base sm:text-lg md:text-xl leading-relaxed mb-6 md:mb-8 max-w-xl">
+        <p class="text-zinc-300 text-base sm:text-lg md:text-xl leading-relaxed mb-6 md:mb-8 max-w-xl mx-auto lg:mx-0">
           Film, serie e anime — nuovi o vecchi, conosciuti o di nicchia.
           Stream HTTP diretti + <strong class="text-white">Torbox</strong> o <strong class="text-white">Real-Debrid</strong>.
           Una sola installazione, tutto in italiano.
         </p>
 
         <!-- LIVE USAGE — fetched ogni 60s da /api/usage -->
-        <div id="live-usage" class="hidden mb-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+        <div id="live-usage" class="hidden mb-6 flex flex-wrap items-center justify-center lg:justify-start gap-x-5 gap-y-2 text-sm">
           <div class="inline-flex items-center gap-2 text-zinc-200">
             <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-dot"></span>
             <span><strong id="live-1h" class="text-white font-bold tabular-nums">—</strong> <span class="text-zinc-400">attivi adesso</span></span>
@@ -336,60 +336,7 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
           </div>
         </div>
 
-        <!-- DONAZIONI tramite buono regalo Amazon via Bitrefill.
-             L'utente compra una gift card Amazon, la invia come regalo
-             all'email pezz8io@proton.me. Zero KYC, zero account lato Pezzottio. -->
-        <div id="donate-gift" class="card px-4 py-3 mb-6 max-w-xl" style="border-left: 3px solid #ff9900;">
-          <div class="flex items-center gap-2 mb-2">
-            <span class="text-base">🎁</span>
-            <span class="font-semibold text-zinc-100 text-sm">Sostieni Pezzottio</span>
-          </div>
-          <div class="text-xs text-zinc-400 leading-relaxed mb-3">
-            Server, banda e dominio si pagano. Puoi donare con un <strong class="text-zinc-200">buono regalo Amazon</strong> di qualsiasi taglio (da €5 in su) — semplice, anonimo, niente account.
-          </div>
-          <a href="https://www.bitrefill.com/it/it/gift-cards/amazon_it-italy/" target="_blank" rel="noopener" class="inline-flex items-center gap-2 px-4 py-2 rounded text-sm font-semibold text-black transition hover:opacity-90" style="background:#ff9900;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M3.5 18.5C7 22 17 22 20.5 18.5l-1-1C16.5 21 7.5 21 4.5 17.5l-1 1zM22 16l-1-3-3 1 1 3 3-1z"/></svg>
-            Acquista su Bitrefill
-          </a>
-          <!-- Guida sempre visibile (richiesta utente: non collapsabile) -->
-          <div class="mt-3 pt-3 border-t border-white/[0.06]">
-            <div class="text-[11px] font-medium text-zinc-200 mb-1.5">Come funziona</div>
-            <div class="pl-1 text-[11px] text-zinc-400 leading-relaxed space-y-1">
-              <div>1. Apri il link Bitrefill qui sopra → scegli il taglio (€5, €10, €25, €50…)</div>
-              <div>2. Click <strong class="text-zinc-200">Acquista ora</strong></div>
-              <div>3. Spunta <strong class="text-zinc-200">Invia come regalo</strong></div>
-              <div>4. Inserisci l'email destinatario:</div>
-              <div class="flex items-center gap-2 mt-1">
-                <code class="mono text-[10px] bg-white/[0.04] border border-white/[0.08] rounded px-2 py-1 text-zinc-200 flex-1 min-w-0 truncate">pezz8io@proton.me</code>
-                <button data-copy-addr="pezz8io@proton.me" class="copy-addr-btn text-[10px] px-2 py-1 rounded font-medium text-black transition hover:opacity-90 whitespace-nowrap shrink-0" style="background:#ff9900;">Copia</button>
-              </div>
-              <div class="text-[10px] text-zinc-500 pt-1">Paghi con carta, PayPal, Apple/Google Pay o crypto — quello che preferisci. Il buono arriva via email diretto a Pezzottio.</div>
-            </div>
-          </div>
-          <!-- Donazioni crypto dirette (minimal: solo label + indirizzo + copia) -->
-          <div class="mt-3 pt-3 border-t border-white/[0.06]">
-            <div class="text-[11px] font-medium text-zinc-200 mb-1.5">Oppure in crypto</div>
-            <div class="space-y-1">
-              <div class="flex items-center gap-2">
-                <span class="text-[10px] font-semibold text-zinc-300 w-12 shrink-0">BTC</span>
-                <code class="mono text-[10px] bg-white/[0.04] border border-white/[0.08] rounded px-2 py-1 text-zinc-300 flex-1 min-w-0 truncate" title="bc1qcu9ch68gua0u4pgfqzlxshtdv99s06pwyhu4mm">bc1qcu9ch68gua0u4pgfqzlxshtdv99s06pwyhu4mm</code>
-                <button data-copy-addr="bc1qcu9ch68gua0u4pgfqzlxshtdv99s06pwyhu4mm" class="copy-addr-btn text-[10px] px-2 py-1 rounded bg-white/[0.04] border border-white/[0.08] text-zinc-300 hover:bg-white/[0.08] transition whitespace-nowrap shrink-0">Copia</button>
-              </div>
-              <div class="flex items-center gap-2">
-                <span class="text-[10px] font-semibold text-zinc-300 w-12 shrink-0">ETH</span>
-                <code class="mono text-[10px] bg-white/[0.04] border border-white/[0.08] rounded px-2 py-1 text-zinc-300 flex-1 min-w-0 truncate" title="0x8915E5A201d66d55C91F9828c580931dB92fD82a">0x8915E5A201d66d55C91F9828c580931dB92fD82a</code>
-                <button data-copy-addr="0x8915E5A201d66d55C91F9828c580931dB92fD82a" class="copy-addr-btn text-[10px] px-2 py-1 rounded bg-white/[0.04] border border-white/[0.08] text-zinc-300 hover:bg-white/[0.08] transition whitespace-nowrap shrink-0">Copia</button>
-              </div>
-              <div class="flex items-center gap-2">
-                <span class="text-[10px] font-semibold text-zinc-300 w-12 shrink-0">Solana</span>
-                <code class="mono text-[10px] bg-white/[0.04] border border-white/[0.08] rounded px-2 py-1 text-zinc-300 flex-1 min-w-0 truncate" title="9U21MvZGgGhXpjuTz9MNfYorTQEYhkfd1LtWfjA9ib7W">9U21MvZGgGhXpjuTz9MNfYorTQEYhkfd1LtWfjA9ib7W</code>
-                <button data-copy-addr="9U21MvZGgGhXpjuTz9MNfYorTQEYhkfd1LtWfjA9ib7W" class="copy-addr-btn text-[10px] px-2 py-1 rounded bg-white/[0.04] border border-white/[0.08] text-zinc-300 hover:bg-white/[0.08] transition whitespace-nowrap shrink-0">Copia</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex flex-wrap items-center gap-3">
+        <div class="flex flex-wrap items-center justify-center lg:justify-start gap-3">
           <a href="#setup" class="btn-primary inline-flex items-center gap-2 px-7 py-3.5 rounded uppercase text-base">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
             Inizia ora
@@ -482,6 +429,57 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
             </div>
           </div>
         </div>
+
+        <!-- DONAZIONI tramite buono regalo Amazon via Bitrefill.
+             Posizionata sotto il mockup per bilanciare la colonna destra
+             rispetto alla colonna sinistra (testo + CTA). -->
+        <div id="donate-gift" class="card px-4 py-3 mt-5" style="border-left: 3px solid #ff9900;">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-base">🎁</span>
+            <span class="font-semibold text-zinc-100 text-sm">Sostieni Pezzottio</span>
+          </div>
+          <div class="text-xs text-zinc-400 leading-relaxed mb-3">
+            Server, banda e dominio si pagano. Puoi donare con un <strong class="text-zinc-200">buono regalo Amazon</strong> di qualsiasi taglio (da €5 in su) — semplice, anonimo, niente account.
+          </div>
+          <a href="https://www.bitrefill.com/it/it/gift-cards/amazon_it-italy/" target="_blank" rel="noopener" class="inline-flex items-center gap-2 px-4 py-2 rounded text-sm font-semibold text-black transition hover:opacity-90" style="background:#ff9900;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M3.5 18.5C7 22 17 22 20.5 18.5l-1-1C16.5 21 7.5 21 4.5 17.5l-1 1zM22 16l-1-3-3 1 1 3 3-1z"/></svg>
+            Acquista su Bitrefill
+          </a>
+          <div class="mt-3 pt-3 border-t border-white/[0.06]">
+            <div class="text-[11px] font-medium text-zinc-200 mb-1.5">Come funziona</div>
+            <div class="pl-1 text-[11px] text-zinc-400 leading-relaxed space-y-1">
+              <div>1. Apri il link Bitrefill qui sopra → scegli il taglio (€5, €10, €25, €50…)</div>
+              <div>2. Click <strong class="text-zinc-200">Acquista ora</strong></div>
+              <div>3. Spunta <strong class="text-zinc-200">Invia come regalo</strong></div>
+              <div>4. Inserisci l'email destinatario:</div>
+              <div class="flex items-center gap-2 mt-1">
+                <code class="mono text-[10px] bg-white/[0.04] border border-white/[0.08] rounded px-2 py-1 text-zinc-200 flex-1 min-w-0 truncate">pezz8io@proton.me</code>
+                <button data-copy-addr="pezz8io@proton.me" class="copy-addr-btn text-[10px] px-2 py-1 rounded font-medium text-black transition hover:opacity-90 whitespace-nowrap shrink-0" style="background:#ff9900;">Copia</button>
+              </div>
+              <div class="text-[10px] text-zinc-500 pt-1">Paghi con carta, PayPal, Apple/Google Pay o crypto — quello che preferisci. Il buono arriva via email diretto a Pezzottio.</div>
+            </div>
+          </div>
+          <div class="mt-3 pt-3 border-t border-white/[0.06]">
+            <div class="text-[11px] font-medium text-zinc-200 mb-1.5">Oppure in crypto</div>
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] font-semibold text-zinc-300 w-12 shrink-0">BTC</span>
+                <code class="mono text-[10px] bg-white/[0.04] border border-white/[0.08] rounded px-2 py-1 text-zinc-300 flex-1 min-w-0 truncate" title="bc1qcu9ch68gua0u4pgfqzlxshtdv99s06pwyhu4mm">bc1qcu9ch68gua0u4pgfqzlxshtdv99s06pwyhu4mm</code>
+                <button data-copy-addr="bc1qcu9ch68gua0u4pgfqzlxshtdv99s06pwyhu4mm" class="copy-addr-btn text-[10px] px-2 py-1 rounded bg-white/[0.04] border border-white/[0.08] text-zinc-300 hover:bg-white/[0.08] transition whitespace-nowrap shrink-0">Copia</button>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] font-semibold text-zinc-300 w-12 shrink-0">ETH</span>
+                <code class="mono text-[10px] bg-white/[0.04] border border-white/[0.08] rounded px-2 py-1 text-zinc-300 flex-1 min-w-0 truncate" title="0x8915E5A201d66d55C91F9828c580931dB92fD82a">0x8915E5A201d66d55C91F9828c580931dB92fD82a</code>
+                <button data-copy-addr="0x8915E5A201d66d55C91F9828c580931dB92fD82a" class="copy-addr-btn text-[10px] px-2 py-1 rounded bg-white/[0.04] border border-white/[0.08] text-zinc-300 hover:bg-white/[0.08] transition whitespace-nowrap shrink-0">Copia</button>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] font-semibold text-zinc-300 w-12 shrink-0">Solana</span>
+                <code class="mono text-[10px] bg-white/[0.04] border border-white/[0.08] rounded px-2 py-1 text-zinc-300 flex-1 min-w-0 truncate" title="9U21MvZGgGhXpjuTz9MNfYorTQEYhkfd1LtWfjA9ib7W">9U21MvZGgGhXpjuTz9MNfYorTQEYhkfd1LtWfjA9ib7W</code>
+                <button data-copy-addr="9U21MvZGgGhXpjuTz9MNfYorTQEYhkfd1LtWfjA9ib7W" class="copy-addr-btn text-[10px] px-2 py-1 rounded bg-white/[0.04] border border-white/[0.08] text-zinc-300 hover:bg-white/[0.08] transition whitespace-nowrap shrink-0">Copia</button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -514,7 +512,7 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
 
     <!-- STATS -->
     <section class="py-10 md:py-16">
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 text-center md:text-left">
         <div>
           <div class="stat-num text-4xl sm:text-5xl md:text-6xl font-extrabold" style="color:var(--red)"><span id="counter-scrapers">0</span>+</div>
           <div class="stat-label mt-2 sm:mt-3">Tracker indicizzati</div>
@@ -536,14 +534,14 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
 
     <!-- COSA FA -->
     <section id="cosa-fa" class="py-10 md:py-16 border-t border-white/[0.06]">
-      <h2 class="text-2xl sm:text-3xl md:text-4xl font-extrabold mb-3 flex items-center">
+      <h2 class="text-2xl sm:text-3xl md:text-4xl font-extrabold mb-3 flex items-center justify-center md:justify-start">
         <span class="section-bar"></span>
         Cosa fa, davvero.
       </h2>
-      <p class="text-zinc-400 text-base sm:text-lg mb-8 md:mb-12 max-w-2xl ml-[18px]">
+      <p class="text-zinc-400 text-base sm:text-lg mb-8 md:mb-12 max-w-2xl mx-auto md:mx-0 md:ml-[18px] text-center md:text-left">
         Non un altro addon torrent. Sei capacità integrate che lavorano insieme.
       </p>
-      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 text-center sm:text-left">
         <div>
           <div class="text-base font-bold text-white mb-2">Stream HTTP italiani</div>
           <p class="text-sm text-zinc-400 leading-relaxed">
@@ -591,13 +589,13 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
 
     <!-- COME FUNZIONA -->
     <section class="py-10 md:py-16 border-t border-white/[0.06]">
-      <h2 class="text-2xl sm:text-3xl md:text-4xl font-extrabold mb-3 flex items-center">
+      <h2 class="text-2xl sm:text-3xl md:text-4xl font-extrabold mb-3 flex items-center justify-center md:justify-start">
         <span class="section-bar"></span>
         Pronto in 30 secondi.
       </h2>
-      <p class="text-zinc-400 text-base sm:text-lg mb-8 md:mb-14 ml-[18px]">Zero installazione. Zero configurazione lato server.</p>
+      <p class="text-zinc-400 text-base sm:text-lg mb-8 md:mb-14 md:ml-[18px] text-center md:text-left">Zero installazione. Zero configurazione lato server.</p>
 
-      <div class="grid md:grid-cols-3 gap-8 md:gap-10">
+      <div class="grid md:grid-cols-3 gap-8 md:gap-10 text-center md:text-left">
         <div class="relative">
           <div class="step-num mb-4">01</div>
           <div class="text-lg font-bold text-white mb-2">Incolla la key debrid</div>
@@ -650,11 +648,11 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
 
     <!-- SETUP -->
     <section id="setup" class="py-10 md:py-16 border-t border-white/[0.06] max-w-2xl mx-auto">
-      <h2 class="text-2xl sm:text-3xl md:text-4xl font-extrabold mb-3 flex items-center">
+      <h2 class="text-2xl sm:text-3xl md:text-4xl font-extrabold mb-3 flex items-center justify-center md:justify-start">
         <span class="section-bar"></span>
         Configura il tuo link.
       </h2>
-      <p class="text-zinc-400 text-base sm:text-lg mb-8 md:mb-10 ml-[18px]">
+      <p class="text-zinc-400 text-base sm:text-lg mb-8 md:mb-10 md:ml-[18px] text-center md:text-left">
         Pezzottio funziona con <strong class="text-white">Torbox</strong> e <strong class="text-white">Real-Debrid</strong> —
         uno, l'altro o entrambi in parallelo. Le tue key restano solo nel link, niente account, niente database.
       </p>
@@ -1022,11 +1020,11 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
 
     <!-- FAQ -->
     <section class="py-10 md:py-16 border-t border-white/[0.06] max-w-3xl mx-auto">
-      <h2 class="text-2xl sm:text-3xl md:text-4xl font-extrabold mb-3 flex items-center">
+      <h2 class="text-2xl sm:text-3xl md:text-4xl font-extrabold mb-3 flex items-center justify-center md:justify-start">
         <span class="section-bar"></span>
         Domande frequenti.
       </h2>
-      <p class="text-zinc-400 text-base sm:text-lg mb-8 md:mb-10 ml-[18px]">Le risposte alle cose che chiedono tutti.</p>
+      <p class="text-zinc-400 text-base sm:text-lg mb-8 md:mb-10 md:ml-[18px] text-center md:text-left">Le risposte alle cose che chiedono tutti.</p>
       <div>
         <details class="faq-item">
           <summary>È davvero gratis?<span class="faq-icon text-2xl">+</span></summary>
