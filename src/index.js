@@ -247,13 +247,46 @@ hlsRouter.get('/:prov/:id/:season/:episode/master.m3u8', async (req, res) => {
       return res.type('application/vnd.apple.mpegurl').send(lines.join('\n'));
     }
 
-    // Costruisco master ridotto: solo HEADER (riscritti) + lo STREAM-INF scelto
+    // Costruisco master ridotto: solo HEADER (riscritti) + lo STREAM-INF scelto.
+    // Rinforzo HLS per player mobile strict (AVPlayer iOS in particolare):
+    //   1. EXT-X-INDEPENDENT-SEGMENTS se assente (AVPlayer lo vuole)
+    //   2. Se nessun EXT-X-MEDIA TYPE=AUDIO presente (= audio muxato nel video,
+    //      tipico file VidXgo single-variant), aggiungo una EXT-X-MEDIA fittizia
+    //      con DEFAULT=YES,LANGUAGE="ita" + AUDIO="audio" sul EXT-X-STREAM-INF
+    //      → segnala esplicitamente al player che esiste una traccia audio
+    //      default ITA da riprodurre (senza questo, AVPlayer iOS a volte
+    //      "dimentica" di abilitare l'audio del segment muxato).
     const out = [];
+    const hasIndependentSegments = headerLines.some((h) => h.startsWith('#EXT-X-INDEPENDENT-SEGMENTS'));
+    const hasAudioMedia = headerLines.some((h) => /^#EXT-X-MEDIA:[^]*TYPE=AUDIO/.test(h));
+    let infLine = chosenBlock.infLine;
+    if (!hasAudioMedia && !/AUDIO="[^"]+"/.test(infLine)) {
+      // Audio muxato (no separate track): inietto group hint per il player mobile.
+      // Inserisco la EXT-X-MEDIA DOPO #EXTM3U/EXT-X-VERSION (ordine HLS spec).
+      infLine = infLine.replace(/(#EXT-X-STREAM-INF:[^,]*),/, '$1,AUDIO="audio",');
+      // Fallback se la regex sopra non matcha (caso bizzarro)
+      if (!/AUDIO="audio"/.test(infLine)) {
+        infLine = infLine.replace(/#EXT-X-STREAM-INF:/, '#EXT-X-STREAM-INF:AUDIO="audio",');
+      }
+    }
+
     for (const h of headerLines) {
       if (h.startsWith('#')) out.push(rewriteHeaderLine(h));
       else out.push(h);
     }
-    out.push(chosenBlock.infLine);
+    if (!hasIndependentSegments) {
+      // Inserisco subito dopo #EXTM3U (prima riga di solito)
+      const insertAt = out.findIndex((l) => l.startsWith('#EXTM3U'));
+      if (insertAt >= 0) {
+        out.splice(insertAt + 1, 0, '#EXT-X-INDEPENDENT-SEGMENTS');
+      } else {
+        out.unshift('#EXT-X-INDEPENDENT-SEGMENTS');
+      }
+    }
+    if (!hasAudioMedia) {
+      out.push('#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",NAME="Italian",DEFAULT=YES,AUTOSELECT=YES,LANGUAGE="ita"');
+    }
+    out.push(infLine);
     out.push(rewriteUrl(chosenBlock.urlLine));
 
     res.setHeader('X-Quality', chosenLabel);

@@ -4,7 +4,7 @@
     "items": [
       { "type": "fix", "msg": "GuardaSerie: audio ITA ora si sente. Mancava il flag '&h=1' nell'URL master playlist — il CDN serviva la versione senza traccia audio ITA separata. Stessa pipeline che StreamingCommunity usava già correttamente." },
       { "type": "perf", "msg": "Auto-detect VidXgo down: se l'upstream restituisce 403 ip_range blocked, il provider va in cooldown 1h invece di spammare richieste a vuoto. Si riapre da solo al primo health-check successo." },
-      { "type": "feat", "msg": "Donazioni crypto integrate. Card 'Sostieni Pezzottio' nella hero di /configure con BTC, ETH e SOL (Copia indirizzo + QR). Mini-guida 'Hai solo Revolut?' che spiega come comprare crypto in app e inviarli. Zero KYC lato Pezzottio, nessun intermediario." },
+      { "type": "feat", "msg": "Donazioni via buono regalo Amazon. Card 'Sostieni Pezzottio' nella hero di /configure: compri un buono Amazon di qualsiasi taglio (da €5 in su) su Bitrefill, lo invii come regalo all'email indicata. Paghi con carta, PayPal, Apple/Google Pay o crypto — quello che preferisci. Zero account lato Pezzottio." },
       { "type": "feat", "msg": "Profili multipli ora supportano Real-Debrid per-profilo: ogni profilo può avere la sua chiave Torbox e/o Real-Debrid indipendenti, oppure ereditare quelle globali come fallback." },
       { "type": "feat", "msg": "Anime via Kitsu: per gli anime long-running (One Piece, Naruto, Bleach...) traduzione automatica episodio assoluto → S/E TMDB. Esempio: One Piece ep 1163 da Kitsu = S23E08 nel lookup RD/Torbox." },
       { "type": "feat", "msg": "Per gli anime aggiunto fallback Nyaa (sub ITA + ITA) sia per Torbox che Real-Debrid quando l'API di cache esterna non ha l'episodio (gap su release recenti)." },

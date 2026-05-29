@@ -215,4 +215,16 @@ async function resolveSegmentUrl(numericId, season, episode, isMovie, segmentPat
   return null;
 }
 
-module.exports = { findStream, getMasterUrlCached, cdnFetch, resolveSegmentUrl, isDown };
+// Pulizia totale delle cache in-memory + reset cooldown down.
+// Usato da /debug/cache-flush per forzare refresh senza restart del server
+// (utile dopo deploy di fix che cambia il modo di costruire URL master,
+// es. aggiunta del flag &h=1 per l'audio ITA).
+function clearCaches() {
+  const sizes = { cache: cache.size, masterCache: masterCache.size, wasDown: isDown() };
+  cache.clear();
+  masterCache.clear();
+  clearDown();
+  return sizes;
+}
+
+module.exports = { findStream, getMasterUrlCached, cdnFetch, resolveSegmentUrl, isDown, clearCaches };
