@@ -199,7 +199,11 @@ builder.defineStreamHandler(async ({ type, id }) => {
       slugsPromise,
     ]);
 
-    const publicHost = process.env.PUBLIC_HOST || `http://${getConfig().host}:${getConfig().port}`;
+    // Priorità: 1) publicHost iniettato per-request dal middleware (req-based),
+    // 2) PUBLIC_HOST env (legacy), 3) fallback localhost:port (dev locale).
+    const publicHost = getConfig().publicHost
+      || process.env.PUBLIC_HOST
+      || `http://${getConfig().host}:${getConfig().port}`;
     const httpStreams = [];
 
     // === LAZY HTTP STREAMS (anime) ===
