@@ -1604,12 +1604,11 @@ function serveManifest(req, res) {
 // Tutto il resto va all'SDK router, dentro un contesto ALS con la config dell'utente.
 const sdkRouter = getRouter(addonInterface);
 app.use((req, res, next) => {
-  // Inietta publicHost derivato dalla request (Host/X-Forwarded-Host).
-  // Serve all'addon.js per costruire URL /play e /resolve senza dover dipendere
-  // da PUBLIC_HOST hardcoded nel .env: ogni richiesta usa il suo dominio
-  // di ingresso (utile per multi-host: pezz8io.dpdns.org, tv., dev., localhost).
-  const cfg = { ...(req.userConfig || {}), publicHost: publicBase(req) };
-  runWithConfig(cfg, () => sdkRouter(req, res, next));
+  // publicHost derivato dalla request (Host/X-Forwarded-Host) viene passato
+  // come 3° arg separato a runWithConfig — così non finisce in encodeConfig(user)
+  // e ogni richiesta vede l'host del suo dominio di ingresso senza propagarlo
+  // nei link emessi (cfgB64 resta pulito = solo {tb, rd, order, ...}).
+  runWithConfig(req.userConfig || {}, () => sdkRouter(req, res, next), publicBase(req));
 });
 
 const c = getConfig();

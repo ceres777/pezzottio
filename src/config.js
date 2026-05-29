@@ -22,8 +22,10 @@ function decodeConfig(str) {
 
 // Esegue un handler dentro un context con la config dell'utente.
 // La config si propaga automaticamente attraverso async/await.
-function runWithConfig(userConfig, fn) {
-  return als.run({ user: userConfig || {} }, fn);
+// publicHost (opzionale) viene salvato separato da user — così non finisce
+// in encodeConfig(user) e nei link emessi: è meta-context per-request.
+function runWithConfig(userConfig, fn, publicHost) {
+  return als.run({ user: userConfig || {}, publicHost: publicHost || null }, fn);
 }
 
 function getConfig() {
@@ -35,7 +37,8 @@ function getConfig() {
   return {
     port: parseInt(process.env.PORT || '7001', 10),
     host: process.env.HOST || (process.env.RENDER || process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1'),
-    publicHost: process.env.PUBLIC_HOST || null,
+    // publicHost: prima dal context ALS (per-request), poi env, poi null.
+    publicHost: store?.publicHost || process.env.PUBLIC_HOST || null,
     realdebridKey: user.rd || '',
     torboxKey: user.tb || '',
     maxResults: parseInt(process.env.MAX_RESULTS || '25', 10),
