@@ -229,23 +229,26 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
     /* Step numbers — Netflix style */
     .step-num {
       font-family: 'Bebas Neue', sans-serif;
-      font-size: 64px; line-height: 0.9; font-weight: 900;
+      font-size: 48px; line-height: 0.9; font-weight: 900;
       background: linear-gradient(180deg, var(--red) 0%, transparent 120%);
       -webkit-background-clip: text; background-clip: text;
       -webkit-text-fill-color: transparent;
     }
+    @media (min-width: 640px) { .step-num { font-size: 64px; } }
 
     /* FAQ */
     .faq-item { border-bottom: 1px solid rgba(255,255,255,0.08); }
     .faq-item:last-child { border-bottom: 0; }
     .faq-item summary {
-      padding: 18px 0; cursor: pointer;
-      display: flex; align-items: center; justify-content: space-between;
-      font-size: 16px; font-weight: 600; color: white;
+      padding: 14px 0; cursor: pointer;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      font-size: 15px; font-weight: 600; color: white;
     }
+    @media (min-width: 640px) { .faq-item summary { padding: 18px 0; font-size: 16px; } }
     .faq-item summary:hover { color: var(--red); }
     .faq-item[open] summary { color: var(--red); }
-    .faq-item .faq-body { padding: 0 0 18px 0; color: var(--text-dim); font-size: 14px; line-height: 1.6; }
+    .faq-item .faq-body { padding: 0 0 14px 0; color: var(--text-dim); font-size: 13px; line-height: 1.6; }
+    @media (min-width: 640px) { .faq-item .faq-body { padding: 0 0 18px 0; font-size: 14px; } }
     .faq-icon { transition: transform 0.2s; }
     .faq-item[open] .faq-icon { transform: rotate(45deg); }
 
@@ -266,7 +269,7 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
 
   <!-- Banner breaking change (visibile solo se /api/notice ritorna qualcosa, dismiss persistito in localStorage) -->
   <div id="notice-banner" class="hidden" style="background:linear-gradient(90deg,rgba(239,68,68,0.12),rgba(239,68,68,0.04));border-bottom:1px solid rgba(239,68,68,0.25)">
-    <div class="max-w-6xl mx-auto px-6 py-3 flex items-center gap-3 text-sm">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3 text-sm">
       <span class="text-base">🚨</span>
       <div class="flex-1 text-zinc-200">
         <span class="font-semibold text-red-400 mr-2">Avviso:</span>
@@ -279,7 +282,7 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
 
   <!-- NAV TOP -->
   <nav class="border-b border-white/[0.06]">
-    <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
       <div class="flex items-center gap-4">
         <img src="/pezzottio-logo.png" alt="PEZZOTTIO" class="h-7 md:h-8 select-none" draggable="false" />
         <span class="mono text-[10px] text-zinc-600 hidden md:inline">v${version}</span>
@@ -298,12 +301,12 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
     </div>
   </nav>
 
-  <main class="max-w-6xl mx-auto px-6">
+  <main class="max-w-6xl mx-auto px-4 sm:px-6">
 
     <!-- HERO SPLIT: text + mockup -->
-    <header class="grid lg:grid-cols-[1.1fr_1fr] gap-12 lg:gap-16 items-center pt-16 pb-20">
+    <header class="grid lg:grid-cols-[1.1fr_1fr] gap-8 md:gap-12 lg:gap-16 items-center pt-8 pb-12 md:pt-16 md:pb-20">
       <div>
-        <div class="flex flex-wrap items-center gap-2 mb-6">
+        <div class="flex flex-wrap items-center gap-2 mb-5 md:mb-6">
           <div class="trust-badge">
             <span class="dot"></span> 100% gratis · Open source · Privacy first
           </div>
@@ -311,11 +314,11 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
             <span style="font-size:9px;">●</span> NOVITÀ · Real-Debrid riattivato
           </div>
         </div>
-        <h1 class="text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight mb-6 leading-[1.02]" style="letter-spacing:-0.035em;">
+        <h1 class="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight mb-5 md:mb-6 leading-[1.02]" style="letter-spacing:-0.035em;">
           Tutto lo streaming.<br>
           <span style="color:var(--red)">In italiano.</span>
         </h1>
-        <p class="text-zinc-300 text-lg md:text-xl leading-relaxed mb-8 max-w-xl">
+        <p class="text-zinc-300 text-base sm:text-lg md:text-xl leading-relaxed mb-6 md:mb-8 max-w-xl">
           Film, serie e anime — nuovi o vecchi, conosciuti o di nicchia.
           Stream HTTP diretti + <strong class="text-white">Torbox</strong> o <strong class="text-white">Real-Debrid</strong>.
           Una sola installazione, tutto in italiano.
@@ -483,7 +486,7 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
     </header>
 
     <!-- PROVIDER STRIP -->
-    <section class="py-12 border-y border-white/[0.06]">
+    <section class="py-8 md:py-12 border-y border-white/[0.06]">
       <div class="text-center mb-7">
         <div class="stat-label">Integrato con</div>
       </div>
@@ -510,37 +513,37 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
     </section>
 
     <!-- STATS -->
-    <section class="py-16">
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+    <section class="py-10 md:py-16">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
         <div>
-          <div class="stat-num text-5xl md:text-6xl font-extrabold" style="color:var(--red)"><span id="counter-scrapers">0</span>+</div>
-          <div class="stat-label mt-3">Tracker indicizzati</div>
+          <div class="stat-num text-4xl sm:text-5xl md:text-6xl font-extrabold" style="color:var(--red)"><span id="counter-scrapers">0</span>+</div>
+          <div class="stat-label mt-2 sm:mt-3">Tracker indicizzati</div>
         </div>
         <div>
-          <div class="stat-num text-5xl md:text-6xl font-extrabold"><span id="counter-external">0</span></div>
-          <div class="stat-label mt-3">Fonti meta IT</div>
+          <div class="stat-num text-4xl sm:text-5xl md:text-6xl font-extrabold"><span id="counter-external">0</span></div>
+          <div class="stat-label mt-2 sm:mt-3">Fonti meta IT</div>
         </div>
         <div>
-          <div class="stat-num text-5xl md:text-6xl font-extrabold"><span id="counter-http">0</span></div>
-          <div class="stat-label mt-3">Provider HTTP</div>
+          <div class="stat-num text-4xl sm:text-5xl md:text-6xl font-extrabold"><span id="counter-http">0</span></div>
+          <div class="stat-label mt-2 sm:mt-3">Provider HTTP</div>
         </div>
         <div>
-          <div class="stat-num text-5xl md:text-6xl font-extrabold"><span id="counter-ids">0</span></div>
-          <div class="stat-label mt-3">Formati id</div>
+          <div class="stat-num text-4xl sm:text-5xl md:text-6xl font-extrabold"><span id="counter-ids">0</span></div>
+          <div class="stat-label mt-2 sm:mt-3">Formati id</div>
         </div>
       </div>
     </section>
 
     <!-- COSA FA -->
-    <section id="cosa-fa" class="py-16 border-t border-white/[0.06]">
-      <h2 class="text-3xl md:text-4xl font-extrabold mb-3 flex items-center">
+    <section id="cosa-fa" class="py-10 md:py-16 border-t border-white/[0.06]">
+      <h2 class="text-2xl sm:text-3xl md:text-4xl font-extrabold mb-3 flex items-center">
         <span class="section-bar"></span>
         Cosa fa, davvero.
       </h2>
-      <p class="text-zinc-400 text-lg mb-12 max-w-2xl ml-[18px]">
+      <p class="text-zinc-400 text-base sm:text-lg mb-8 md:mb-12 max-w-2xl ml-[18px]">
         Non un altro addon torrent. Sei capacità integrate che lavorano insieme.
       </p>
-      <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
         <div>
           <div class="text-base font-bold text-white mb-2">Stream HTTP italiani</div>
           <p class="text-sm text-zinc-400 leading-relaxed">
@@ -587,14 +590,14 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
     </section>
 
     <!-- COME FUNZIONA -->
-    <section class="py-16 border-t border-white/[0.06]">
-      <h2 class="text-3xl md:text-4xl font-extrabold mb-3 flex items-center">
+    <section class="py-10 md:py-16 border-t border-white/[0.06]">
+      <h2 class="text-2xl sm:text-3xl md:text-4xl font-extrabold mb-3 flex items-center">
         <span class="section-bar"></span>
         Pronto in 30 secondi.
       </h2>
-      <p class="text-zinc-400 text-lg mb-14 ml-[18px]">Zero installazione. Zero configurazione lato server.</p>
+      <p class="text-zinc-400 text-base sm:text-lg mb-8 md:mb-14 ml-[18px]">Zero installazione. Zero configurazione lato server.</p>
 
-      <div class="grid md:grid-cols-3 gap-10">
+      <div class="grid md:grid-cols-3 gap-8 md:gap-10">
         <div class="relative">
           <div class="step-num mb-4">01</div>
           <div class="text-lg font-bold text-white mb-2">Incolla la key debrid</div>
@@ -646,18 +649,18 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
     </div>
 
     <!-- SETUP -->
-    <section id="setup" class="py-16 border-t border-white/[0.06] max-w-2xl mx-auto">
-      <h2 class="text-3xl md:text-4xl font-extrabold mb-3 flex items-center">
+    <section id="setup" class="py-10 md:py-16 border-t border-white/[0.06] max-w-2xl mx-auto">
+      <h2 class="text-2xl sm:text-3xl md:text-4xl font-extrabold mb-3 flex items-center">
         <span class="section-bar"></span>
         Configura il tuo link.
       </h2>
-      <p class="text-zinc-400 text-lg mb-10 ml-[18px]">
+      <p class="text-zinc-400 text-base sm:text-lg mb-8 md:mb-10 ml-[18px]">
         Pezzottio funziona con <strong class="text-white">Torbox</strong> e <strong class="text-white">Real-Debrid</strong> —
         uno, l'altro o entrambi in parallelo. Le tue key restano solo nel link, niente account, niente database.
       </p>
 
       <!-- TB -->
-      <div class="card card-tb p-6 mb-3">
+      <div class="card card-tb p-4 sm:p-6 mb-3">
         <div class="flex items-center justify-between mb-4">
           <div class="flex items-center gap-3">
             <div class="w-9 h-9 rounded bg-white/5 border border-white/10 flex items-center justify-center font-bold text-xs text-white">TB</div>
@@ -689,7 +692,7 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
       </div>
 
       <!-- RD (riattivato) -->
-      <div class="card card-rd p-6 mb-3">
+      <div class="card card-rd p-4 sm:p-6 mb-3">
         <div class="flex items-center justify-between mb-4">
           <div class="flex items-center gap-3">
             <div class="w-9 h-9 rounded bg-white/5 border border-white/10 flex items-center justify-center font-bold text-xs text-white">RD</div>
@@ -716,7 +719,7 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
       </div>
 
       <!-- Stile risultati -->
-      <div class="card p-5 mb-3">
+      <div class="card p-4 sm:p-5 mb-3">
         <div class="flex items-center gap-3 mb-3">
           <div class="text-base">🎨</div>
           <div>
@@ -750,7 +753,7 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
       </div>
 
       <!-- Ordine risultati -->
-      <div class="card p-5 mb-6">
+      <div class="card p-4 sm:p-5 mb-6">
         <div class="flex items-center gap-3 mb-3">
           <div class="text-base">🎚️</div>
           <div>
@@ -784,7 +787,7 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
       </div>
 
       <!-- Filter risultati -->
-      <div class="card p-5 mb-3">
+      <div class="card p-4 sm:p-5 mb-3">
         <div class="flex items-center gap-3 mb-3">
           <div class="text-base">🎬</div>
           <div>
@@ -818,7 +821,7 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
       </div>
 
       <!-- Filtra risultati ANIME -->
-      <div class="card p-5 mb-3">
+      <div class="card p-4 sm:p-5 mb-3">
         <div class="flex items-center gap-3 mb-3">
           <div class="text-base">🎌</div>
           <div>
@@ -848,7 +851,7 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
 
 
       <!-- Full ITA (solo audio italiano) -->
-      <div class="card p-5 mb-3">
+      <div class="card p-4 sm:p-5 mb-3">
         <label class="flex items-start gap-3 cursor-pointer">
           <input id="full-ita-toggle" type="checkbox" class="mt-1 accent-red-600 w-4 h-4" ${ita ? 'checked' : ''} />
           <div class="flex-1">
@@ -859,7 +862,7 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
       </div>
 
       <!-- Binge mode: auto-prefetch prossimo episodio -->
-      <div class="card p-5 mb-6" style="border-left: 3px solid #c084fc;">
+      <div class="card p-4 sm:p-5 mb-6" style="border-left: 3px solid #c084fc;">
         <label class="flex items-start gap-3 cursor-pointer">
           <input id="prefetch-toggle" type="checkbox" class="mt-1 accent-red-600 w-4 h-4" ${pf ? 'checked' : ''} />
           <div class="flex-1">
@@ -870,7 +873,7 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
       </div>
 
       <!-- PROFILI MULTIPLI -->
-      <details class="card p-5 mb-6" style="border-left: 3px solid #38bdf8;">
+      <details class="card p-4 sm:p-5 mb-6" style="border-left: 3px solid #38bdf8;">
         <summary class="cursor-pointer flex items-center gap-3 select-none list-none">
           <div class="text-base">👨‍👩‍👧</div>
           <div class="flex-1">
@@ -924,7 +927,7 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
     </section>
 
     <!-- RISULTATO -->
-    <section id="install-card" class="card card-install p-6 mb-10 hidden fade-in max-w-2xl mx-auto">
+    <section id="install-card" class="card card-install p-4 sm:p-6 mb-10 hidden fade-in max-w-2xl mx-auto">
       <div class="flex items-center gap-2 mb-1">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-emerald-400"><path d="M20 6L9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <h3 class="text-base font-semibold text-zinc-100" id="install-card-title">Link generato</h3>
@@ -1018,12 +1021,12 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
     </section>
 
     <!-- FAQ -->
-    <section class="py-16 border-t border-white/[0.06] max-w-3xl mx-auto">
-      <h2 class="text-3xl md:text-4xl font-extrabold mb-3 flex items-center">
+    <section class="py-10 md:py-16 border-t border-white/[0.06] max-w-3xl mx-auto">
+      <h2 class="text-2xl sm:text-3xl md:text-4xl font-extrabold mb-3 flex items-center">
         <span class="section-bar"></span>
         Domande frequenti.
       </h2>
-      <p class="text-zinc-400 text-lg mb-10 ml-[18px]">Le risposte alle cose che chiedono tutti.</p>
+      <p class="text-zinc-400 text-base sm:text-lg mb-8 md:mb-10 ml-[18px]">Le risposte alle cose che chiedono tutti.</p>
       <div>
         <details class="faq-item">
           <summary>È davvero gratis?<span class="faq-icon text-2xl">+</span></summary>
@@ -1089,15 +1092,15 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
     </section>
 
     <!-- CTA finale -->
-    <section class="py-20 text-center max-w-2xl mx-auto">
-      <h2 class="text-4xl md:text-5xl font-extrabold mb-5 leading-tight">
+    <section class="py-14 md:py-20 text-center max-w-2xl mx-auto">
+      <h2 class="text-3xl sm:text-4xl md:text-5xl font-extrabold mb-5 leading-tight">
         Smetti di cercare.<br>
         <span style="color:var(--red)">Inizia a guardare.</span>
       </h2>
-      <p class="text-zinc-400 text-lg mb-8">
+      <p class="text-zinc-400 text-base sm:text-lg mb-8">
         Una sola installazione. Tutto in italiano. Pronto in 30 secondi.
       </p>
-      <a href="#setup" class="btn-primary inline-flex items-center gap-2 px-8 py-4 rounded uppercase text-base">
+      <a href="#setup" class="btn-primary inline-flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-4 rounded uppercase text-sm sm:text-base">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
         Genera il mio link
       </a>
