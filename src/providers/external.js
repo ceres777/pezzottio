@@ -197,7 +197,10 @@ const EXTERNAL_ADDONS = [
     label: 'StremThru',
     baseUrl: process.env.STREMTHRU_URL || 'https://stremthru.13377001.xyz/stremio/torz/eyJpbmRleGVycyI6bnVsbCwic3RvcmVzIjpbeyJjIjoicDJwIiwidCI6IiJ9XSwiZmlsdGVyIjoiXCJpdFwiIGluIExhbmd1YWdlcyBcdTAwMjZcdTAwMjYgUXVhbGl0eSAhPSBcIkNBTVwiIn0=',
     // Lang switch EN: filter = "en" in Languages && Quality != CAM.
-    baseUrlEN: process.env.STREMTHRU_URL_EN || 'https://stremthru.13377001.xyz/stremio/torz/eyJpbmRleGVycyI6bnVsbCwic3RvcmVzIjpbeyJjIjoicDJwIiwidCI6IiJ9XSwiZmlsdGVyIjoiXCJlblwiIGluIExhbmd1YWdlcyAmJiBRdWFsaXR5ICE9IFwiQ0FNXCIifQ',
+    // Nota: && (escape Unicode) invece di && letterale — StremThru
+    // parsa il filter come expression string e si aspetta il pattern esatto
+    // dell'IT originale, altrimenti torna HTTP 500.
+    baseUrlEN: process.env.STREMTHRU_URL_EN || 'https://stremthru.13377001.xyz/stremio/torz/eyJpbmRleGVycyI6bnVsbCwic3RvcmVzIjpbeyJjIjoicDJwIiwidCI6IiJ9XSwiZmlsdGVyIjoiXCJlblwiIGluIExhbmd1YWdlcyBcdTAwMjZcdTAwMjYgUXVhbGl0eSAhPSBcIkNBTVwiIn0',
     timeout: 3000,
     assumeItalian: true,
     enabled: true,
