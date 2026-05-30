@@ -228,9 +228,14 @@ const EXTERNAL_ADDONS = [
 ];
 
 // === PROTEZIONE: cache + circuit breaker + in-flight dedup ===
-const CACHE_TTL = 10 * 60 * 1000;
+// TTL 30 min (era 10): con 300 utenti che cercano gli stessi titoli popolari,
+// triplichiamo la finestra di cache hit → ~3x meno hit upstream → meno 429.
+const CACHE_TTL = 30 * 60 * 1000;
 const BREAKER_THRESHOLD = 3;
 const BREAKER_COOLDOWN = 5 * 60 * 1000;
+// 429 (rate limit) è cooldown immediato e più lungo: l'upstream ci sta dicendo
+// "fermati subito o ti blocco di più". 10 min e 1 errore basta per attivarlo.
+const RATELIMIT_COOLDOWN = 10 * 60 * 1000;
 
 const _cache = new Map();
 const _breaker = new Map();
@@ -302,8 +307,16 @@ async function _fetchAddon(addon, type, id) {
       clearTimeout(timeoutId);
       const ms = Date.now() - t0;
       if (!res.ok) {
-        _recordError(addon.key, addon.label, addon.breakerThreshold);
-        console.error(`[external] ${addon.label} ${type}/${id} → ${res.status} (${ms}ms)`);
+        // 429 = rate limit → cooldown immediato 10min (no soglia 3 errori).
+        // Continuare a sbattere genera blacklist più dure.
+        if (res.status === 429) {
+          _breaker.set(addon.key, { errors: 0, until: Date.now() + RATELIMIT_COOLDOWN });
+          _bump(addon.key, 'err');
+          console.error(`[external] ${addon.label} ${type}/${id} → 429 — cooldown 10min`);
+        } else {
+          _recordError(addon.key, addon.label, addon.breakerThreshold);
+          console.error(`[external] ${addon.label} ${type}/${id} → ${res.status} (${ms}ms)`);
+        }
         return [];
       }
       _recordSuccess(addon.key);

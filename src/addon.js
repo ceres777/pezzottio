@@ -880,15 +880,27 @@ builder.defineStreamHandler(async ({ type, id }) => {
         const url = `${publicHost}/${cfgB64}/play/${c.infoHash}?${q.toString()}`;
         out.push(formatStream(c, 'RD', url));
       }
-      console.log(`[RD EN] candidates ${candidates.length} → cached ${out.length}`);
+      console.log(`[RD EN] ${imdbId || '?'} candidates ${candidates.length} → cached ${out.length}`);
       return out;
     }
 
     const providerResults = await Promise.all(providers.map((prov) => {
       if (prov.name === 'TB') return resolveTorbox(prov).catch((e) => { console.error('[TB] resolve threw:', e.message); return []; });
       if (prov.name === 'RD') {
-        // EN: skip ICV backend (italo-centrico) → usa rdCached dei provider esterni
-        if (lang === 'en') return Promise.resolve(resolveRealDebridEN());
+        // EN: fonde external addons (rdCached) + backend ICV. ICV è italo-centrico
+        // ma molti torrent multi-lingua hanno track EN; serve come fallback quando
+        // gli external addons EN sono rate-limited (Comet 429, StremThru timeout).
+        // Dedup successiva per URL elimina i doppioni.
+        if (lang === 'en') {
+          return Promise.all([
+            Promise.resolve(resolveRealDebridEN()),
+            resolveRealDebrid(prov).catch((e) => { console.error('[RD EN icv] threw:', e.message); return []; }),
+          ]).then(([fromExternals, fromIcv]) => {
+            const merged = [...fromExternals, ...fromIcv];
+            console.log(`[RD EN merge] ${imdbId || '?'} external=${fromExternals.length} icv=${fromIcv.length} total=${merged.length}`);
+            return merged;
+          });
+        }
         return resolveRealDebrid(prov).catch((e) => { console.error('[RD] resolve threw:', e.message, '\n', e.stack); return []; });
       }
       return Promise.resolve([]);
