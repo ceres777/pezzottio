@@ -1490,101 +1490,71 @@ app.get('/', (req, res) => {
 </html>`);
 });
 
-// === EXTRA CATALOG PROXY (/extra/*) ===
-// Proxy completo verso un addon di metadata esterno preconfigurato.
-// Lo serviamo sotto il nostro dominio con branding "Pezzottio Extra" così
-// l'utente non vede il nome dell'addon upstream nel dialog Stremio.
-// Solo manifest viene riscritto (id + name); catalog/meta/subtitles sono
-// passthrough con caching aggressivo.
-const EXTRA_UPSTREAM = process.env.EXTRA_CATALOG_UPSTREAM
-  || 'https://aiometadata.elfhosted.com/stremio/3bfc4ec0-ef9d-4703-98ca-ab313631d178';
-// Upstream EN: configurazione AIOMetadata separata (lingua/sources orientati EN).
-// Lo serviamo sotto /extra-en/* con rebranding "Pezzottio Extra (English)".
-const EXTRA_UPSTREAM_EN = process.env.EXTRA_CATALOG_UPSTREAM_EN
-  || 'https://aiometadata.elfhosted.com/stremio/e06851f2-66a3-4cd7-afb9-b80c6a2c9f01';
+// === EXTRA CATALOG (/extra/*) — TMDB-direct, no AIOMetadata dependency ===
+// Espone cataloghi streaming (Netflix, Prime, Disney+, ecc.) chiamando
+// direttamente TMDB /discover con with_watch_providers + watch_region.
+// Vantaggi vs proxy AIOMetadata (precedente):
+//   - Zero rate-limit / banning di provider terzi
+//   - Stessa fonte dati (TMDB) sotto al cofano
+//   - Più catalog se vuoi (Crunchyroll anime, regional providers IT/US)
+//   - Cache locale lato VPS, più veloce
+const pezzottioExtra = require('./providers/pezzottio-extra');
 
-function _extraTtl(path) {
-  if (/manifest\.json$/.test(path)) return 5 * 60 * 1000;        // 5min
-  if (/^\/meta\//.test(path)) return 6 * 60 * 60 * 1000;          // 6h
-  if (/^\/catalog\//.test(path)) return 60 * 60 * 1000;           // 1h
-  if (/^\/subtitles\//.test(path)) return 60 * 60 * 1000;         // 1h
-  return 10 * 60 * 1000;                                          // default
-}
-
-// Factory: crea un proxy reusable per qualsiasi upstream AIOMetadata.
-// `brand` definisce il rebranding del manifest (id/name/description).
-function _createExtraProxy({ upstream, brand }) {
-  const cache = new Map();
-  async function fetchPath(subpath) {
-    const ckey = subpath;
-    const ttl = _extraTtl(subpath);
-    const hit = cache.get(ckey);
-    if (hit && Date.now() - hit.t < ttl) return hit;
-    try {
-      const r = await fetch(`${upstream}${subpath}`, {
-        timeout: 8000,
-        headers: { 'Accept': 'application/json', 'User-Agent': 'Pezzottio-Proxy/1.0' },
-      });
-      const body = await r.text();
-      const entry = { body, status: r.status, t: Date.now() };
-      if (r.ok) cache.set(ckey, entry);
-      return entry;
-    } catch (e) {
-      console.error(`[${brand.id}]`, subpath, e.message);
-      return { body: '{"err":"upstream"}', status: 502, t: Date.now() };
-    }
-  }
+// Factory: serve manifest/catalog/meta del nostro catalogo TMDB-based.
+// `region` = 'IT' (default lingua italiana) o 'US' (lingua inglese).
+function _createExtraHandler(region) {
+  const language = region === 'IT' ? 'it-IT' : 'en-US';
   return async (req, res) => {
     const subpath = (req.params[0] || '/').split('?')[0];
-    // Manifest: rebrand
-    if (subpath === '/manifest.json' || subpath === '/') {
-      const r = await fetchPath('/manifest.json');
-      if (r.status >= 400) return res.status(r.status).type('application/json').send(r.body);
-      try {
-        const m = JSON.parse(r.body);
-        m.id = brand.id;
-        m.name = brand.name;
-        m.description = brand.description;
+    try {
+      // /manifest.json o root
+      if (subpath === '/manifest.json' || subpath === '/') {
+        const m = pezzottioExtra.buildManifest(region);
         m.logo = `${publicBase(req)}/logo.png`;
-        if (m.behaviorHints) {
-          delete m.behaviorHints.configurable;
-          delete m.behaviorHints.configurationRequired;
-        }
         res.setHeader('Content-Type', 'application/json');
         res.setHeader('Cache-Control', 'max-age=300, public');
         return res.send(JSON.stringify(m));
-      } catch (e) {
-        return res.status(502).json({ err: 'manifest parse failed' });
       }
+      // /catalog/:type/:id.json o /catalog/:type/:id/:extra.json
+      const catMatch = subpath.match(/^\/catalog\/(movie|series)\/([^/]+?)(?:\/(.+))?\.json$/);
+      if (catMatch) {
+        const type = catMatch[1];
+        const catalogId = catMatch[2];
+        const extraStr = catMatch[3] || '';
+        const extra = {};
+        for (const kv of extraStr.split('&')) {
+          const [k, v] = kv.split('=');
+          if (k && v !== undefined) extra[decodeURIComponent(k)] = decodeURIComponent(v);
+        }
+        const result = await pezzottioExtra.fetchCatalog({ catalogId, region, language, extra });
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Cache-Control', 'max-age=600, public');
+        return res.send(JSON.stringify(result));
+      }
+      // /meta/:type/tmdb:NNN.json
+      const metaMatch = subpath.match(/^\/meta\/(movie|series)\/(tmdb:\d+)\.json$/);
+      if (metaMatch) {
+        const stremioType = metaMatch[1];
+        const id = metaMatch[2];
+        const meta = await pezzottioExtra.fetchMeta({ stremioType, id, language });
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Cache-Control', 'max-age=3600, public');
+        return res.send(JSON.stringify({ meta: meta || null }));
+      }
+      // Path sconosciuto
+      res.status(404).json({ err: 'not found' });
+    } catch (e) {
+      console.error(`[extra ${region}]`, subpath, e.message);
+      res.status(500).json({ err: 'internal error' });
     }
-    // Tutto il resto: passthrough
-    const r = await fetchPath(subpath);
-    res.status(r.status || 200);
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Cache-Control', `max-age=${Math.floor(_extraTtl(subpath) / 1000)}, public`);
-    res.send(r.body);
   };
 }
 
-// /extra/* → catalogo IT (Netflix/Prime/Disney+/HBO/Apple TV+/Crunchyroll, descrizioni italiane)
-app.get(/^\/extra(\/.*)?$/, _createExtraProxy({
-  upstream: EXTRA_UPSTREAM,
-  brand: {
-    id: 'org.pezzottio.extracatalogs',
-    name: 'Pezzottio Extra',
-    description: 'Catalog Netflix, Prime Video, Disney+, HBO Max, Apple TV+, Crunchyroll integrato in Pezzottio.',
-  },
-}));
+// /extra/* → catalogo IT (TMDB region=IT, lingua italiana)
+app.get(/^\/extra(\/.*)?$/, _createExtraHandler('IT'));
 
-// /extra-en/* → catalogo EN (config AIOMetadata separata, lingua/source EN-oriented)
-app.get(/^\/extra-en(\/.*)?$/, _createExtraProxy({
-  upstream: EXTRA_UPSTREAM_EN,
-  brand: {
-    id: 'org.pezzottio.extracatalogs.en',
-    name: 'Pezzottio Extra (English)',
-    description: 'Netflix, Prime Video, Disney+, HBO Max, Apple TV+, Crunchyroll catalog — English edition integrated in Pezzottio.',
-  },
-}));
+// /extra-en/* → catalogo EN (TMDB region=US, lingua inglese)
+app.get(/^\/extra-en(\/.*)?$/, _createExtraHandler('US'));
 
 // Manifest dinamico: rimuove i cataloghi Pezzottio Anime se l'utente ha
 // disabilitato l'anime nella sua config (httpAnime=false). Catalogo e stream
