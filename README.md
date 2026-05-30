@@ -215,7 +215,7 @@ Pezzottio's `/stream` resolver, in its default configuration, fans out requests 
 
 Catalog data for the Pezzottio Extra catalog (streaming platform sections like Netflix / Prime / Disney+ etc.) is fetched directly from the **public [TMDB API](https://developer.themoviedb.org/)** — no AIOMetadata / external metadata proxy. Anime metadata comes from **[Kitsu API](https://kitsu.docs.apiary.io/)**.
 
-If you're running an instance and want us off your servers, just open an issue — we'll switch defaults or remove. We're also working on self-hosting these upstreams ourselves to reduce load.
+If you're running one of these instances and want us off your servers, please open an issue on this repo or DM me — honestly I don't have a direct contact for Munif / Goldy / Midnight and didn't know how to reach out before defaulting to your endpoints (which I should have figured out first, my bad). Opening an issue here is the most reliable way to reach me, and I'll switch defaults or remove entirely, no questions asked. Self-hosting these upstreams ourselves is also on the roadmap to reduce load regardless.
 
 ---
 
