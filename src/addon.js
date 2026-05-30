@@ -736,7 +736,9 @@ builder.defineStreamHandler(async ({ type, id }) => {
         'udp://tracker.torrent.eu.org:451/announce',
       ];
       const out = [];
-      // Ordino per ITA tier + qualità: audio ITA > sub ITA > altro
+      // Ordino per tier (IT o EN a seconda di lang) + qualità.
+      // Detection lang-aware: detecto ENTRAMBI per popolare i flag che servono
+      // a formatStream (label '🇺🇸 ENG' / '🇮🇹 ITA' + fallback default).
       const enriched = cached.map((c) => {
         const text = `${c.title || ''} ${(c.file && c.file.title) || ''}`;
         return {
@@ -744,18 +746,26 @@ builder.defineStreamHandler(async ({ type, id }) => {
           _text: text,
           _italian: isItalian(text),
           _italianSub: hasItalianSub(text),
+          _english: isEnglish(text),
+          _englishSub: hasEnglishSub(text),
           _quality: parseQuality(text),
         };
       });
-      const tier = (c) => (c._italian ? 0 : c._italianSub ? 1 : 2);
+      // Lang IT (default): audio ITA > sub ITA > resto.
+      // Lang EN: audio EN > sub EN > resto.
+      const tier = lang === 'en'
+        ? (c) => (c._english ? 0 : c._englishSub ? 1 : 2)
+        : (c) => (c._italian ? 0 : c._italianSub ? 1 : 2);
       const QR = { '4K': 5, '1080p': 4, '720p': 3, '480p': 2, CAM: 1 };
       enriched.sort((a, b) => {
         const td = tier(a) - tier(b);
         if (td !== 0) return td;
         return (QR[b._quality] || 0) - (QR[a._quality] || 0);
       });
-      // Full ITA filter: esclude release senza marker italiano
-      const pool = fullIta ? enriched.filter((c) => c._italian) : enriched;
+      // Full-lang filter: esclude release senza marker della lingua scelta.
+      // fullIta è il toggle esistente IT — per EN per ora lasciamo passare tutto
+      // (la maggior parte dei torrent USA non ha marker "english" esplicito).
+      const pool = (lang !== 'en' && fullIta) ? enriched.filter((c) => c._italian) : enriched;
       for (const c of pool) {
         if (out.length >= maxResults) break;
         const fi = (c.file && c.file.file_index != null) ? c.file.file_index : '';
@@ -777,6 +787,8 @@ builder.defineStreamHandler(async ({ type, id }) => {
           seeds: c.seeders,
           italian: c._italian,
           italianSub: c._italianSub,
+          english: c._english,
+          englishSub: c._englishSub,
           quality: c._quality,
           seasonPack: c.isPack,
           trackers: TRACKERS,
