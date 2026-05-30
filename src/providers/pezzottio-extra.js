@@ -77,8 +77,19 @@ function _cacheSet(map, key, v) {
 // ─────────────────────────────────────────────────────────────────────
 // Manifest
 // ─────────────────────────────────────────────────────────────────────
+// Label dei type esposti a Stremio (visibili come tab nel Discover).
+// IT: "Film" / "Serie" (come AIOMetadata IT precedente, coerente con Stremio italiano).
+// EN: "Movies" / "TV Series" (chiaro per utenti EN).
+// Search catalogs invece restano col type standard 'movie'/'series' perché Stremio
+// usa quei type per la search bar globale — i custom non funzionano per search.
+const TYPE_LABELS = {
+  IT: { movie: 'Film', series: 'Serie' },
+  US: { movie: 'Movies', series: 'TV Series' },
+};
+
 function buildManifest(region) {
   const isEN = region === 'US';
+  const labels = TYPE_LABELS[region] || TYPE_LABELS.US;
   const provs = CATALOGS_BY_REGION[region] || CATALOGS_BY_REGION.US;
   const catalogs = [];
   for (const key of provs) {
@@ -90,7 +101,7 @@ function buildManifest(region) {
     ];
     catalogs.push({
       id: `pezzottio-extra-${key}-movie`,
-      type: 'movie',
+      type: labels.movie,
       name: p.label,
       pageSize: PAGE_SIZE,
       extra,
@@ -98,14 +109,14 @@ function buildManifest(region) {
     });
     catalogs.push({
       id: `pezzottio-extra-${key}-series`,
-      type: 'series',
+      type: labels.series,
       name: p.label,
       pageSize: PAGE_SIZE,
       extra,
       showInHome: true,
     });
   }
-  // Search cataloghi
+  // Search cataloghi — type standard per consentire search globale di Stremio.
   catalogs.push({
     id: 'pezzottio-extra-search-movie',
     type: 'movie',
@@ -126,7 +137,8 @@ function buildManifest(region) {
       ? 'Netflix, Prime Video, Disney+, HBO Max, Apple TV+, Paramount+, Peacock, Hulu, Crunchyroll catalog — English edition. Powered by TMDB.'
       : 'Catalogo Netflix, Prime Video, Disney+, HBO Max, Apple TV+, Sky Go, NOW TV, Mediaset, RaiPlay, TimVision, Crunchyroll integrato in Pezzottio. Powered by TMDB.',
     resources: ['catalog', 'meta'],
-    types: ['movie', 'series'],
+    // Lista types deve includere TUTTI quelli usati nei catalog (custom + standard).
+    types: [labels.movie, labels.series, 'movie', 'series'],
     idPrefixes: ['tmdb:'],
     catalogs,
     behaviorHints: { configurable: false, configurationRequired: false },

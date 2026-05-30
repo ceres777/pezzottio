@@ -1502,6 +1502,12 @@ const pezzottioExtra = require('./providers/pezzottio-extra');
 
 // Factory: serve manifest/catalog/meta del nostro catalogo TMDB-based.
 // `region` = 'IT' (default lingua italiana) o 'US' (lingua inglese).
+// Mappa type custom (Film/Serie/Movies/TV Series) → stremioType standard.
+const _STREMIO_TYPE_MAP = {
+  'movie': 'movie', 'series': 'series',
+  'Film': 'movie', 'Serie': 'series',
+  'Movies': 'movie', 'TV Series': 'series',
+};
 function _createExtraHandler(region) {
   const language = region === 'IT' ? 'it-IT' : 'en-US';
   return async (req, res) => {
@@ -1516,9 +1522,11 @@ function _createExtraHandler(region) {
         return res.send(JSON.stringify(m));
       }
       // /catalog/:type/:id.json o /catalog/:type/:id/:extra.json
-      const catMatch = subpath.match(/^\/catalog\/(movie|series)\/([^/]+?)(?:\/(.+))?\.json$/);
+      // :type può essere standard (movie/series) o custom (Film/Serie/Movies/TV Series).
+      // Il tipo effettivo viene derivato dal catalogId (suffix -movie/-series),
+      // il :type del path è solo cosmetic per Stremio.
+      const catMatch = subpath.match(/^\/catalog\/([^/]+)\/([^/]+?)(?:\/(.+))?\.json$/);
       if (catMatch) {
-        const type = catMatch[1];
         const catalogId = catMatch[2];
         const extraStr = catMatch[3] || '';
         const extra = {};
@@ -1531,10 +1539,11 @@ function _createExtraHandler(region) {
         res.setHeader('Cache-Control', 'max-age=600, public');
         return res.send(JSON.stringify(result));
       }
-      // /meta/:type/tmdb:NNN.json
-      const metaMatch = subpath.match(/^\/meta\/(movie|series)\/(tmdb:\d+)\.json$/);
+      // /meta/:type/tmdb:NNN.json — :type può essere standard o custom
+      const metaMatch = subpath.match(/^\/meta\/([^/]+)\/(tmdb:\d+)\.json$/);
       if (metaMatch) {
-        const stremioType = metaMatch[1];
+        const typeRaw = decodeURIComponent(metaMatch[1]);
+        const stremioType = _STREMIO_TYPE_MAP[typeRaw] || 'movie';
         const id = metaMatch[2];
         const meta = await pezzottioExtra.fetchMeta({ stremioType, id, language });
         res.setHeader('Content-Type', 'application/json');
