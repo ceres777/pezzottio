@@ -237,24 +237,125 @@ Open `http://127.0.0.1:7001/configure` (IT) or `/configure-en` (EN).
 
 Free deploy on Render: the repo includes `render.yaml`. Fork → New Web Service → Deploy.
 
-### Self-hosting the upstream community addons (recommended for heavy users)
+### Self-hosting the upstream community addons (required for production)
 
-Pezzottio defaults to the public instances listed above, but you can override each one via env vars to point at your own private instance:
+**On a fresh clone, StremThru / Comet / MediaFusion / Meteor are DISABLED** (no env vars set). This is intentional: each one would otherwise hit the maintainers' free public instance, and a Pezzottio deployment serving >50 users would burden their infrastructure. Pezzottio still works in this state — the internal scrapers, the Italian HTTP providers (StreamingCommunity / VidXgo / AnimeWorld / AnimeSaturn / AnimeUnity), Torrentio (open mirror), the catalogs, and the debrid resolvers all stay active — but you'll get a smaller torrent pool.
 
-```bash
-# In .env — leave blank to keep the community default, or set your own URL
-TORRENTIO_URL=https://my-torrentio.example.com/providers=yts,eztv,...
-COMET_URL=https://my-comet.example.com/eyJ...config-base64...
-COMET_URL_EN=...                           # same with EN-language filter
-STREMTHRU_URL=https://my-stremthru.example.com/stremio/torz/eyJ...
-STREMTHRU_URL_EN=...
-MEDIAFUSION_URL=https://my-mediafusion.example.com/encrypted-token
-MEDIAFUSION_HOST=https://my-mediafusion.example.com
-METEOR_URL=https://my-meteor.example.com/eyJ...
-METEOR_URL_EN=...
+To bring StremThru / Comet / MediaFusion online, host them yourself with Docker on the same VPS. Here's a `docker-compose.yml` that runs all three behind a shared Postgres + Redis, binding only to `127.0.0.1` so they're reachable from the Pezzottio Node process but not exposed to the public internet:
+
+```yaml
+# /root/upstreams/docker-compose.yml
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: pezzottio-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: postgres
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    shm_size: 1g
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --maxmemory 200mb --maxmemory-policy allkeys-lru
+    volumes:
+      - ./data/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+
+  zilean:
+    image: ipromknight/zilean:latest
+    restart: unless-stopped
+    depends_on: { postgres: { condition: service_healthy } }
+    ports: ["127.0.0.1:8181:8181"]
+    environment:
+      Zilean__Database__ConnectionString: "Host=postgres;Database=zilean;Username=postgres;Password=${POSTGRES_PASSWORD}"
+    volumes: ["./data/zilean:/app/data"]
+
+  comet:
+    image: g0ldyy/comet:latest
+    restart: unless-stopped
+    depends_on: { postgres: { condition: service_healthy }, zilean: { condition: service_started } }
+    ports: ["127.0.0.1:8000:8000"]
+    environment:
+      DATABASE_TYPE: postgresql
+      DATABASE_URL: "postgres:${POSTGRES_PASSWORD}@postgres:5432/comet"
+      SCRAPE_ZILEAN: "True"
+      ZILEAN_URL: "http://zilean:8181"
+    volumes: ["./data/comet:/app/data"]
+
+  stremthru:
+    image: ghcr.io/muniftanjim/stremthru:latest
+    restart: unless-stopped
+    ports: ["127.0.0.1:8080:8080"]
+    volumes: ["./data/stremthru:/app/data"]
+
+  mediafusion:
+    image: mhdzumair/mediafusion:6.0.0-beta.12
+    restart: unless-stopped
+    depends_on: { postgres: { condition: service_healthy }, redis: { condition: service_healthy } }
+    ports: ["127.0.0.1:8001:8000"]
+    environment:
+      SECRET_KEY: ${MEDIAFUSION_SECRET_KEY}
+      API_PASSWORD: ${MEDIAFUSION_API_PASSWORD}
+      POSTGRES_URI: "postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/mediafusion"
+      REDIS_URL: "redis://redis:6379"
+      HOST_URL: "http://127.0.0.1:8001"
+      CONTACT_EMAIL: "you@example.com"
+      TASKIQ_SINGLE_WORKER_MODE: "true"
+      GUNICORN_WORKERS: "2"
 ```
 
-Each upstream has its own Docker / install guide on the repo linked in the Credits table. **StremThru** and **Comet** are the lightest (~50-150 MB RAM each) and the most worth self-hosting if you have spare infra — they cover ~90% of what `/stream` needs.
+The matching `init-db.sql` (creates the per-app databases inside the shared Postgres):
+
+```sql
+CREATE DATABASE zilean;
+CREATE DATABASE comet;
+CREATE DATABASE mediafusion;
+```
+
+And the `.env` next to the compose file (generate the secrets with `openssl rand -hex 16`):
+
+```bash
+POSTGRES_PASSWORD=<openssl rand -hex 16>
+MEDIAFUSION_SECRET_KEY=<openssl rand -hex 16>
+MEDIAFUSION_API_PASSWORD=<openssl rand -hex 12>
+```
+
+Bring everything up:
+
+```bash
+docker compose up -d
+# Zilean's DMM hashlist import takes 1–6 hours on first run.
+# StremThru and MediaFusion are usable within ~1 minute.
+```
+
+Then point the Pezzottio process at the local containers by adding these to **Pezzottio's** `.env` (not the upstreams' `.env`):
+
+```bash
+# Replace <B64_*> with the base64 config you want — see the per-addon repo READMEs
+# for the schema. The configs Pezzottio uses internally enable the IT/EN language
+# filters and the "filter on cached torrents" toggles.
+STREMTHRU_URL=http://127.0.0.1:8080/stremio/torz/<B64_STREMTHRU_IT>
+STREMTHRU_URL_EN=http://127.0.0.1:8080/stremio/torz/<B64_STREMTHRU_EN>
+COMET_URL=http://127.0.0.1:8000/<B64_COMET_IT>
+COMET_URL_EN=http://127.0.0.1:8000/<B64_COMET_EN>
+MEDIAFUSION_URL=http://127.0.0.1:8001
+MEDIAFUSION_HOST=http://127.0.0.1:8001
+```
+
+Restart Pezzottio (`pm2 restart pezzottio --update-env` or equivalent). On startup the log will show `[external] active: Torrentio, MediaFusion, Comet, StremThru` confirming the local upstreams are wired up.
+
+**Meteor** is closed-source and has no Docker image — there is no self-host option. If you don't want to depend on `meteorfortheweebs.midnightignite.me`, leave `METEOR_URL`/`METEOR_URL_EN` unset and Meteor will simply be skipped.
 
 ---
 
