@@ -362,7 +362,7 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
           <div class="text-sm text-zinc-300 leading-relaxed mb-4">
             Server, bandwidth and domain cost money. You can donate with an <strong class="text-white">Amazon gift card</strong> of any amount (from $5/€5 up) — simple, anonymous, no account needed.
           </div>
-          <a href="https://www.bitrefill.com/us/it/gift-cards/amazon_it-italy/" target="_blank" rel="noopener" class="inline-flex items-center gap-2 px-4 py-2.5 rounded text-sm font-semibold text-black transition hover:opacity-90" style="background:#ff9900;">
+          <a href="https://www.bitrefill.com/us/en/gift-cards/amazon_it-italy/" target="_blank" rel="noopener" class="inline-flex items-center gap-2 px-4 py-2.5 rounded text-sm font-semibold text-black transition hover:opacity-90" style="background:#ff9900;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M3.5 18.5C7 22 17 22 20.5 18.5l-1-1C16.5 21 7.5 21 4.5 17.5l-1 1zM22 16l-1-3-3 1 1 3 3-1z"/></svg>
             Buy on Bitrefill
           </a>
