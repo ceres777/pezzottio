@@ -82,14 +82,21 @@ async function _getMediaFusionToken(rdKey) {
 }
 
 async function _buildBaseUrl(addon, rdKey) {
-  // Lang patch: se utente ha lang='en', rimuovi |language=italian dal URL
-  // Torrentio così non filtra i risultati italiani-only. Backward compat:
-  // lang='it' default → URL invariato (resta con language=italian).
+  // Lang switch per-request:
+  // - Torrentio: rimuovo |language=italian quando lang='en'
+  // - Comet / StremThru / Meteor: swap a baseUrlEN (config encoded che
+  //   filtra "en" invece di "it" — necessario perché le loro config B64
+  //   includono required/exclude language hard-coded).
+  // Backward compat: lang='it' default → tutto invariato per utenti IT.
   let baseUrl = addon.baseUrl;
   try {
     const lang = getConfig().lang;
-    if (lang === 'en' && addon.key === 'torrentio') {
-      baseUrl = baseUrl.replace(/\|language=italian/g, '');
+    if (lang === 'en') {
+      if (addon.key === 'torrentio') {
+        baseUrl = baseUrl.replace(/\|language=italian/g, '');
+      } else if (addon.baseUrlEN) {
+        baseUrl = addon.baseUrlEN;
+      }
     }
   } catch (_) { /* getConfig non chiamato in test runtime — fallback safe */ }
   if (!rdKey) return baseUrl;
@@ -106,16 +113,17 @@ async function _buildBaseUrl(addon, rdKey) {
       return `${baseUrl}|realdebrid=${rdKey}`;
     }
     if (addon.key === 'comet') {
-      const m = addon.baseUrl.match(/^(https?:\/\/[^/]+\/)([^/]+)$/);
-      if (!m) return addon.baseUrl;
+      // Uso `baseUrl` (lang-aware: IT o EN) per estrarre+riencodare il config.
+      const m = baseUrl.match(/^(https?:\/\/[^/]+\/)([^/]+)$/);
+      if (!m) return baseUrl;
       const cfg = JSON.parse(Buffer.from(m[2], 'base64').toString('utf8'));
       cfg.debridServices = [{ service: 'realdebrid', apiKey: rdKey, hosts: [] }];
       const newB64 = Buffer.from(JSON.stringify(cfg), 'utf8').toString('base64');
       return m[1] + newB64;
     }
     if (addon.key === 'stremthru') {
-      const m = addon.baseUrl.match(/^(.+\/torz\/)([^/]+)$/);
-      if (!m) return addon.baseUrl;
+      const m = baseUrl.match(/^(.+\/torz\/)([^/]+)$/);
+      if (!m) return baseUrl;
       const cfg = JSON.parse(Buffer.from(m[2], 'base64').toString('utf8'));
       cfg.stores = [{ c: 'rd', t: rdKey }];
       const newB64 = Buffer.from(JSON.stringify(cfg), 'utf8').toString('base64');
@@ -123,7 +131,7 @@ async function _buildBaseUrl(addon, rdKey) {
     }
     if (addon.key === 'mediafusion') {
       const token = await _getMediaFusionToken(rdKey);
-      if (!token) return addon.baseUrl; // fallback torrent-only
+      if (!token) return baseUrl; // fallback torrent-only
       const host = (process.env.MEDIAFUSION_HOST || 'https://mediafusionfortheweebs.midnightignite.me').replace(/\/$/, '');
       return `${host}/${token}`;
     }
@@ -131,8 +139,8 @@ async function _buildBaseUrl(addon, rdKey) {
       // Il config base64 ha "debridService":"torrent" e "debridApiKey":"" →
       // restituisce stream torrent-only, nessun tag [RD+]. Sovrascrivo con
       // la chiave RD utente così Meteor pre-filtra i cached server-side.
-      const m = addon.baseUrl.match(/^(.+\/)([^/]+)$/);
-      if (!m) return addon.baseUrl;
+      const m = baseUrl.match(/^(.+\/)([^/]+)$/);
+      if (!m) return baseUrl;
       const cfg = JSON.parse(Buffer.from(m[2], 'base64').toString('utf8'));
       cfg.debridService = 'realdebrid';
       cfg.debridApiKey = rdKey;
@@ -177,6 +185,9 @@ const EXTERNAL_ADDONS = [
     key: 'comet',
     label: 'Comet',
     baseUrl: process.env.COMET_URL || 'https://comet.feels.legal/eyJtYXhSZXN1bHRzUGVyUmVzb2x1dGlvbiI6MCwibWF4U2l6ZSI6MCwiY2FjaGVkT25seSI6ZmFsc2UsInNvcnRDYWNoZWRVbmNhY2hlZFRvZ2V0aGVyIjpmYWxzZSwicmVtb3ZlVHJhc2giOnRydWUsInJlc3VsdEZvcm1hdCI6WyJhbGwiXSwiZGVicmlkU2VydmljZXMiOltdLCJlbmFibGVUb3JyZW50Ijp0cnVlLCJkZWR1cGxpY2F0ZVN0cmVhbXMiOmZhbHNlLCJzY3JhcGVEZWJyaWRBY2NvdW50VG9ycmVudHMiOmZhbHNlLCJkZWJyaWRTdHJlYW1Qcm94eVBhc3N3b3JkIjoiIiwibGFuZ3VhZ2VzIjp7InJlcXVpcmVkIjpbIml0Il0sImFsbG93ZWQiOlsibXVsdGkiLCJpdCJdLCJleGNsdWRlIjpbImVuIiwiamEiLCJ6aCIsInJ1IiwiYXIiLCJwdCIsImVzIiwiZnIiLCJkZSIsImtvIiwiaGkiLCJibiIsInBhIiwibXIiLCJndSIsInRhIiwidGUiLCJrbiIsIm1sIiwidGgiLCJ2aSIsImlkIiwidHIiLCJoZSIsImZhIiwidWsiLCJlbCIsImx0IiwibHYiLCJldCIsInBsIiwiY3MiLCJzayIsImh1Iiwicm8iLCJiZyIsInNyIiwiaHIiLCJzbCIsIm5sIiwiZGEiLCJmaSIsInN2Iiwibm8iLCJtcyIsImxhIl0sInByZWZlcnJlZCI6WyJpdCJdfSwicmVzb2x1dGlvbnMiOnsicjI0MHAiOmZhbHNlfSwib3B0aW9ucyI6eyJyZW1vdmVfcmFua3NfdW5kZXIiOi0xMDAwMDAwMDAwLCJhbGxvd19lbmdsaXNoX2luX2xhbmd1YWdlcyI6ZmFsc2UsInJlbW92ZV91bmtub3duX2xhbmd1YWdlcyI6ZmFsc2V9fQ==',
+    // Lang switch EN: required:[en], allowed:[multi,en], exclude:[it,ja,...], preferred:[en].
+    // Usato solo se getConfig().lang === 'en' (vedi _buildBaseUrl).
+    baseUrlEN: process.env.COMET_URL_EN || 'https://comet.feels.legal/eyJtYXhSZXN1bHRzUGVyUmVzb2x1dGlvbiI6MCwibWF4U2l6ZSI6MCwiY2FjaGVkT25seSI6ZmFsc2UsInNvcnRDYWNoZWRVbmNhY2hlZFRvZ2V0aGVyIjpmYWxzZSwicmVtb3ZlVHJhc2giOnRydWUsInJlc3VsdEZvcm1hdCI6WyJhbGwiXSwiZGVicmlkU2VydmljZXMiOltdLCJlbmFibGVUb3JyZW50Ijp0cnVlLCJkZWR1cGxpY2F0ZVN0cmVhbXMiOmZhbHNlLCJzY3JhcGVEZWJyaWRBY2NvdW50VG9ycmVudHMiOmZhbHNlLCJkZWJyaWRTdHJlYW1Qcm94eVBhc3N3b3JkIjoiIiwibGFuZ3VhZ2VzIjp7InJlcXVpcmVkIjpbImVuIl0sImFsbG93ZWQiOlsibXVsdGkiLCJlbiJdLCJleGNsdWRlIjpbIml0IiwiamEiLCJ6aCIsInJ1IiwiYXIiLCJwdCIsImVzIiwiZnIiLCJkZSIsImtvIiwiaGkiLCJibiIsInBhIiwibXIiLCJndSIsInRhIiwidGUiLCJrbiIsIm1sIiwidGgiLCJ2aSIsImlkIiwidHIiLCJoZSIsImZhIiwidWsiLCJlbCIsImx0IiwibHYiLCJldCIsInBsIiwiY3MiLCJzayIsImh1Iiwicm8iLCJiZyIsInNyIiwiaHIiLCJzbCIsIm5sIiwiZGEiLCJmaSIsInN2Iiwibm8iLCJtcyIsImxhIl0sInByZWZlcnJlZCI6WyJlbiJdfSwicmVzb2x1dGlvbnMiOnsicjI0MHAiOmZhbHNlfSwib3B0aW9ucyI6eyJyZW1vdmVfcmFua3NfdW5kZXIiOi0xMDAwMDAwMDAwLCJhbGxvd19lbmdsaXNoX2luX2xhbmd1YWdlcyI6dHJ1ZSwicmVtb3ZlX3Vua25vd25fbGFuZ3VhZ2VzIjpmYWxzZX19',
     timeout: 3000,
     assumeItalian: true,
     enabled: true,
@@ -185,6 +196,8 @@ const EXTERNAL_ADDONS = [
     key: 'stremthru',
     label: 'StremThru',
     baseUrl: process.env.STREMTHRU_URL || 'https://stremthru.13377001.xyz/stremio/torz/eyJpbmRleGVycyI6bnVsbCwic3RvcmVzIjpbeyJjIjoicDJwIiwidCI6IiJ9XSwiZmlsdGVyIjoiXCJpdFwiIGluIExhbmd1YWdlcyBcdTAwMjZcdTAwMjYgUXVhbGl0eSAhPSBcIkNBTVwiIn0=',
+    // Lang switch EN: filter = "en" in Languages && Quality != CAM.
+    baseUrlEN: process.env.STREMTHRU_URL_EN || 'https://stremthru.13377001.xyz/stremio/torz/eyJpbmRleGVycyI6bnVsbCwic3RvcmVzIjpbeyJjIjoicDJwIiwidCI6IiJ9XSwiZmlsdGVyIjoiXCJlblwiIGluIExhbmd1YWdlcyAmJiBRdWFsaXR5ICE9IFwiQ0FNXCIifQ',
     timeout: 3000,
     assumeItalian: true,
     enabled: true,
@@ -193,6 +206,8 @@ const EXTERNAL_ADDONS = [
     key: 'meteor',
     label: 'Meteor',
     baseUrl: process.env.METEOR_URL || 'https://meteorfortheweebs.midnightignite.me/eyJkZWJyaWRTZXJ2aWNlIjoidG9ycmVudCIsImRlYnJpZEFwaUtleSI6IiIsImNhY2hlZE9ubHkiOnRydWUsImVuYWJsZVlvdXJNZWRpYSI6ZmFsc2UsInlvdXJNZWRpYUxlZ2FjeU1vZGUiOmZhbHNlLCJzaG93WW91ck1lZGlhU3RyZWFtcyI6ZmFsc2UsInlvdXJNZWRpYVNvdXJjZXMiOlsidG9ycmVudCJdLCJyZW1vdmVUcmFzaCI6ZmFsc2UsInJlbW92ZVNhbXBsZXMiOmZhbHNlLCJyZW1vdmVBZHVsdCI6ZmFsc2UsImV4Y2x1ZGUzRCI6ZmFsc2UsImVuYWJsZVNlYURleCI6ZmFsc2UsImVuYWJsZVVzZW5ldCI6ZmFsc2UsInVzZW5ldEN1c3RvbUVuZ2luZXMiOmZhbHNlLCJtaW5TZWVkZXJzIjowLCJtYXhSZXN1bHRzIjowLCJtYXhSZXN1bHRzUGVyUmVzIjowLCJtYXhTaXplIjowLCJyZXNvbHV0aW9ucyI6W10sImxhbmd1YWdlcyI6eyJwcmVmZXJyZWQiOlsibXVsdGkiLCJpdCJdLCJyZXF1aXJlZCI6WyJpdCIsIm11bHRpIl0sImV4Y2x1ZGUiOltdfSwicmVzdWx0Rm9ybWF0IjpbInRpdGxlIiwicXVhbGl0eSIsInNpemUiLCJhdWRpbyJdLCJzb3J0T3JkZXIiOlsicGFjayIsImNhY2hlZCIsInlvdXJtZWRpYSIsInNlYWRleCIsInJlc29sdXRpb24iLCJzaXplIiwicXVhbGl0eSIsInNlZWRlcnMiLCJsYW5ndWFnZSIsInR5cGUiXX0',
+    // Lang switch EN: preferred:[multi,en], required:[en,multi].
+    baseUrlEN: process.env.METEOR_URL_EN || 'https://meteorfortheweebs.midnightignite.me/eyJkZWJyaWRTZXJ2aWNlIjoidG9ycmVudCIsImRlYnJpZEFwaUtleSI6IiIsImNhY2hlZE9ubHkiOnRydWUsImVuYWJsZVlvdXJNZWRpYSI6ZmFsc2UsInlvdXJNZWRpYUxlZ2FjeU1vZGUiOmZhbHNlLCJzaG93WW91ck1lZGlhU3RyZWFtcyI6ZmFsc2UsInlvdXJNZWRpYVNvdXJjZXMiOlsidG9ycmVudCJdLCJyZW1vdmVUcmFzaCI6ZmFsc2UsInJlbW92ZVNhbXBsZXMiOmZhbHNlLCJyZW1vdmVBZHVsdCI6ZmFsc2UsImV4Y2x1ZGUzRCI6ZmFsc2UsImVuYWJsZVNlYURleCI6ZmFsc2UsImVuYWJsZVVzZW5ldCI6ZmFsc2UsInVzZW5ldEN1c3RvbUVuZ2luZXMiOmZhbHNlLCJtaW5TZWVkZXJzIjowLCJtYXhSZXN1bHRzIjowLCJtYXhSZXN1bHRzUGVyUmVzIjowLCJtYXhTaXplIjowLCJyZXNvbHV0aW9ucyI6W10sImxhbmd1YWdlcyI6eyJwcmVmZXJyZWQiOlsibXVsdGkiLCJlbiJdLCJyZXF1aXJlZCI6WyJlbiIsIm11bHRpIl0sImV4Y2x1ZGUiOltdfSwicmVzdWx0Rm9ybWF0IjpbInRpdGxlIiwicXVhbGl0eSIsInNpemUiLCJhdWRpbyJdLCJzb3J0T3JkZXIiOlsicGFjayIsImNhY2hlZCIsInlvdXJtZWRpYSIsInNlYWRleCIsInJlc29sdXRpb24iLCJzaXplIiwicXVhbGl0eSIsInNlZWRlcnMiLCJsYW5ndWFnZSIsInR5cGUiXX0',
     timeout: 3000,
     assumeItalian: true,
     enabled: true,
