@@ -840,9 +840,36 @@ builder.defineStreamHandler(async ({ type, id }) => {
     // Chiamo TUTTI i provider configurati in parallelo e fondo i risultati.
     // L'utente che ha sia RD che TB vede risultati da entrambi.
     console.log(`[debug] providers configured: ${providers.map((p) => p.name).join(',') || '(none)'}`);
+
+    // Resolver RD per lang=en: il backend ICV (resolveRealDebrid) è italo-centrico
+    // → pochi hash per film USA. Bypass: prendiamo i candidates già marcati
+    // rdCached=true dagli external addons (Torrentio/Comet/MediaFusion/StremThru/
+    // Meteor) che fanno cache check RD nativo via |realdebrid=KEY upstream.
+    // Risultato: tutti gli stream RD-cached vengono mostrati come "Pezzottio RD".
+    function resolveRealDebridEN() {
+      const out = [];
+      for (const c of candidates) {
+        if (out.length >= maxResults) break;
+        if (!c.rdCached) continue;
+        const q = new URLSearchParams();
+        if (meta.season) q.set('s', String(meta.season));
+        if (meta.episode) q.set('e', String(meta.episode));
+        q.set('p', 'rd');
+        if (imdbId) q.set('i', imdbId);
+        const url = `${publicHost}/${cfgB64}/play/${c.infoHash}?${q.toString()}`;
+        out.push(formatStream(c, 'RD', url));
+      }
+      console.log(`[RD EN] candidates ${candidates.length} → cached ${out.length}`);
+      return out;
+    }
+
     const providerResults = await Promise.all(providers.map((prov) => {
       if (prov.name === 'TB') return resolveTorbox(prov).catch((e) => { console.error('[TB] resolve threw:', e.message); return []; });
-      if (prov.name === 'RD') return resolveRealDebrid(prov).catch((e) => { console.error('[RD] resolve threw:', e.message, '\n', e.stack); return []; });
+      if (prov.name === 'RD') {
+        // EN: skip ICV backend (italo-centrico) → usa rdCached dei provider esterni
+        if (lang === 'en') return Promise.resolve(resolveRealDebridEN());
+        return resolveRealDebrid(prov).catch((e) => { console.error('[RD] resolve threw:', e.message, '\n', e.stack); return []; });
+      }
       return Promise.resolve([]);
     }));
 
