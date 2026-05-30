@@ -1,5 +1,17 @@
 [
   {
+    "date": "2026-06-02",
+    "items": [
+      { "type": "fix", "msg": "Real-Debrid in versione inglese: gli stream non comparivano più (Stremio li collassava perché avevano tutti lo stesso titolo). Ora ogni risultato mostra nome file, dimensione e seeder distinti → tornano visibili tutti.", "msg_en": "Real-Debrid on English profiles: streams had stopped showing up (Stremio was collapsing them because they all shared the same title). Each result now shows its own filename, size and seeders → they all appear again." },
+      { "type": "fix", "msg": "Stream debrid (RD/TB) ora mostrano filename + dimensione + seeder nel titolo, in stile Torrentio. Prima si vedeva solo il nome del film ripetuto.", "msg_en": "Debrid streams (RD/TB) now show filename + size + seeders in the title, Torrentio-style. Before you'd just see the movie name repeated." },
+      { "type": "fix", "msg": "Cataloghi piattaforme (Mediaset Infinity, RaiPlay, TimVision, Sky Go, Prime Video) tornavano vuoti dopo che TMDB ha rinumerato i provider. ID aggiornati → i cataloghi si ripopolano.", "msg_en": "Platform catalogs (Mediaset Infinity, RaiPlay, TimVision, Sky Go, Prime Video) were coming back empty after TMDB renumbered its providers. IDs refreshed → catalogs populate again." },
+      { "type": "feat", "msg": "Copertura RD e Torbox più ampia sui titoli italiani: i risultati ora fondono più fonti di cache check in parallelo (backend ICV + addon esterni) invece di una sola → più stream trovati.", "msg_en": "Wider RD and Torbox coverage on Italian titles: results now merge multiple cache-check sources in parallel instead of just one → more streams found." },
+      { "type": "perf", "msg": "Affidabilità backend: le fonti esterne (StremThru, Comet, MediaFusion) ora girano su infrastruttura dedicata invece che su istanze pubbliche condivise → molti meno errori 429/timeout sotto carico.", "msg_en": "Backend reliability: the external sources (StremThru, Comet, MediaFusion) now run on dedicated infrastructure instead of shared public instances → far fewer 429/timeout errors under load." },
+      { "type": "feat", "msg": "Server Discord ufficiale di Pezzottio: aggiornamenti in anteprima, supporto e annunci. Link nella pagina /configure e nel manifest dell'addon.", "msg_en": "Official Pezzottio Discord server: early updates, support and announcements. Link on the /configure page and in the addon manifest." },
+      { "type": "feat", "msg": "Changelog ora disponibile anche in inglese su /changelog?lang=en, oltre alla versione italiana.", "msg_en": "Changelog now available in English too at /changelog?lang=en, alongside the Italian version." }
+    ]
+  },
+  {
     "date": "2026-06-01",
     "items": [
       { "type": "fix", "msg": "GuardaSerie: audio ITA ora si sente. Mancava il flag '&h=1' nell'URL master playlist — il CDN serviva la versione senza traccia audio ITA separata. Stessa pipeline che StreamingCommunity usava già correttamente.", "msg_en": "GuardaSerie: ITA audio is now audible. The '&h=1' flag was missing from the master playlist URL — the CDN was serving the version without the separate ITA audio track. Same pipeline StreamingCommunity was already using correctly." },
