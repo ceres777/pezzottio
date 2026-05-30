@@ -433,8 +433,13 @@ builder.defineStreamHandler(async ({ type, id }) => {
     // Rimuove i tag [Provider] ridondanti dal nome (compaiono già in ⚙️)
     const PROVIDER_BRACKETS_RE = /\s*\[(TPB|YTS|EZTV|Nyaa|Knaben|Solid|BS|CSR|MediaFusion|Comet|StremThru|Torrentio)\]\s*/gi;
 
-    // Costruisco la prima riga del title: titolo italiano + (anno) o + S/E
-    const displayTitle = meta.italianTitle || meta.title;
+    // Costruisco la prima riga del title: lang-aware.
+    // - lang='it' (default): preferisce italianTitle (es. "Cinquanta sfumature di grigio")
+    // - lang='en' / 'mixed': preferisce il titolo originale/inglese (es. "Fifty Shades of Grey")
+    // Backward-compat: utenti IT esistenti vedono esattamente come prima.
+    const displayTitle = lang === 'en'
+      ? (meta.title || meta.italianTitle)
+      : (meta.italianTitle || meta.title);
     function buildTitleHeader() {
       if (type === 'series' && meta.season && meta.episode) {
         const s = String(meta.season).padStart(2, '0');
@@ -557,7 +562,7 @@ builder.defineStreamHandler(async ({ type, id }) => {
           addonName: 'Pezzottio', service: 'http', quality: s.quality || 'Direct',
         });
         title = aiosFormatter.formatTitle({
-          title: meta.italianTitle || meta.title,
+          title: displayTitle,
           language: langSingle,
           source: providerFull,
         });
@@ -575,7 +580,7 @@ builder.defineStreamHandler(async ({ type, id }) => {
           ? ` S${String(meta.season).padStart(2,'0')}E${String(meta.episode).padStart(2,'0')}`
           : '';
         const fileLine = realFilename
-          || `${meta.italianTitle || meta.title}${epSuffix} · ${providerFull}`;
+          || `${displayTitle}${epSuffix} · ${providerFull}`;
         title = torrentioFormatter.formatTitle({
           filename: fileLine,
           languages: langsArr(s),
