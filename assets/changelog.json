@@ -1,6 +1,6 @@
 [
   {
-    "date": "2026-06-02",
+    "date": "2026-05-31",
     "items": [
       { "type": "fix", "msg": "Real-Debrid in versione inglese: gli stream non comparivano più (Stremio li collassava perché avevano tutti lo stesso titolo). Ora ogni risultato mostra nome file, dimensione e seeder distinti → tornano visibili tutti.", "msg_en": "Real-Debrid on English profiles: streams had stopped showing up (Stremio was collapsing them because they all shared the same title). Each result now shows its own filename, size and seeders → they all appear again." },
       { "type": "fix", "msg": "Stream debrid (RD/TB) ora mostrano filename + dimensione + seeder nel titolo, in stile Torrentio. Prima si vedeva solo il nome del film ripetuto.", "msg_en": "Debrid streams (RD/TB) now show filename + size + seeders in the title, Torrentio-style. Before you'd just see the movie name repeated." },
@@ -12,7 +12,7 @@
     ]
   },
   {
-    "date": "2026-06-01",
+    "date": "2026-05-30",
     "items": [
       { "type": "fix", "msg": "GuardaSerie: audio ITA ora si sente. Mancava il flag '&h=1' nell'URL master playlist — il CDN serviva la versione senza traccia audio ITA separata. Stessa pipeline che StreamingCommunity usava già correttamente.", "msg_en": "GuardaSerie: ITA audio is now audible. The '&h=1' flag was missing from the master playlist URL — the CDN was serving the version without the separate ITA audio track. Same pipeline StreamingCommunity was already using correctly." },
       { "type": "perf", "msg": "Auto-detect VidXgo down: se l'upstream restituisce 403 ip_range blocked, il provider va in cooldown 1h invece di spammare richieste a vuoto. Si riapre da solo al primo health-check successo.", "msg_en": "Auto-detect VidXgo down: if the upstream returns 403 ip_range blocked, the provider goes into 1h cooldown instead of spamming requests pointlessly. Re-opens itself on the first successful health-check." },
@@ -26,7 +26,7 @@
     ]
   },
   {
-    "date": "2026-05-31",
+    "date": "2026-05-29",
     "items": [
       { "type": "breaking", "msg": "Real-Debrid riattivato. Puoi inserire la tua chiave RD nella pagina /configure, anche in parallelo con Torbox. Nuova pipeline di cache check ~600ms (vs 2.5s del vecchio mylist+verify). Per gli anime aggiunto fallback Nyaa (sub ITA + ITA).", "msg_en": "Real-Debrid re-enabled. You can enter your RD key on /configure, in parallel with Torbox if you want. New cache check pipeline ~600ms (vs 2.5s of the old mylist+verify). For anime, added Nyaa fallback (sub ITA + ITA)." },
       { "type": "feat", "msg": "Per le serie l'API esterna fornisce già file_index + rd_link_index pre-mappati: niente più matching euristico fragile sui pack, il file giusto dell'episodio è sempre quello giusto.", "msg_en": "For series, the external API already provides pre-mapped file_index + rd_link_index: no more fragile heuristic matching on packs, the right episode file is always the right one." },
@@ -35,7 +35,7 @@
     ]
   },
   {
-    "date": "2026-05-30",
+    "date": "2026-05-28",
     "items": [
       { "type": "feat", "msg": "Catalogo anime integrato (Kitsu): 5 sezioni in home — Pezzottio Anime / In Onda / Più Popolari / Top Rated / Nuovi. Search anime via Kitsu, metadata completi (lista episodi con thumbnail, voti, generi). Niente più dipendenza da addon esterni.", "msg_en": "Built-in anime catalog (Kitsu): 5 sections on home — Pezzottio Anime / Airing / Most Popular / Top Rated / New. Anime search via Kitsu, full metadata (episode list with thumbnails, ratings, genres). No more dependency on external addons." },
       { "type": "feat", "msg": "Catalogo extra opzionale 'Pezzottio Extra' (Netflix, Prime Video, Disney+, HBO Max, Apple TV+, Crunchyroll, Paramount+ e altre). Si installa con un click dalla pagina /configure insieme a Pezzottio.", "msg_en": "Optional 'Pezzottio Extra' catalog (Netflix, Prime Video, Disney+, HBO Max, Apple TV+, Crunchyroll, Paramount+ and more). One-click install from /configure alongside Pezzottio." },
@@ -48,7 +48,7 @@
     ]
   },
   {
-    "date": "2026-05-29",
+    "date": "2026-05-27",
     "items": [
       { "type": "feat", "msg": "Nuovo provider HTTP: AnimeUnity. Ora ci sono 3 fonti italiane per anime in parallelo (AnimeWorld + AnimeSaturn + AnimeUnity), con audio italiano nativo dove disponibile", "msg_en": "New HTTP provider: AnimeUnity. There are now 3 Italian anime sources in parallel (AnimeWorld + AnimeSaturn + AnimeUnity), with native Italian audio where available." },
       { "type": "fix", "msg": "Matching anime riscritto da zero: trovati anche titoli in romaji/giapponese (Re:Zero kara Hajimeru, Sousou no Frieren, Boku no Hero Academia, ecc.) grazie agli alias AniList recuperati automaticamente dall'imdb", "msg_en": "Anime matching rewritten from scratch: now finds titles in romaji/Japanese too (Re:Zero kara Hajimeru, Sousou no Frieren, Boku no Hero Academia, etc.) thanks to AniList aliases automatically fetched from IMDB." },
@@ -61,7 +61,7 @@
     ]
   },
   {
-    "date": "2026-05-28",
+    "date": "2026-05-26",
     "items": [
       { "type": "fix", "msg": "AnimeWorld e AnimeSaturn di nuovo operativi (entrambi gli upstream avevano cambiato struttura e i nostri scraper restituivano 0 stream)", "msg_en": "AnimeWorld and AnimeSaturn back online (both upstreams had changed structure and our scrapers were returning 0 streams)." },
       { "type": "fix", "msg": "StreamingCommunity riattivato: stream HLS con audio italiano nativo per film e serie TV", "msg_en": "StreamingCommunity re-enabled: HLS streams with native Italian audio for movies and TV series." },
@@ -77,7 +77,7 @@
     ]
   },
   {
-    "date": "2026-05-27",
+    "date": "2026-05-25",
     "items": [
       { "type": "breaking", "msg": "Pezzottio è ora ufficialmente solo per Torbox. Real-Debrid è in sviluppo (RD ha disabilitato l'API di cache check, supporto in standby finché non troviamo alternativa)", "msg_en": "Pezzottio is now officially Torbox-only. Real-Debrid is under development (RD disabled the cache check API, support is on standby until we find an alternative)." },
       { "type": "config", "msg": "3 stili di layout selezionabili: Pezzottio default / Torrentio classico / AIOStreams compatibile", "msg_en": "3 selectable layout styles: Pezzottio default / Torrentio classic / AIOStreams compatible." },
