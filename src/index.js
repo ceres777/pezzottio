@@ -768,6 +768,18 @@ function donatePage({ title, color, icon, heading, body, ref }) {
 // mostrare quali fonti rispondono. Cache 60s per evitare di martellare le API.
 const STATUS_CACHE_TTL = 60 * 1000;
 let _statusCache = null;
+// Estrae l'host (protocol+hostname+port) da un URL completo + concatena un path.
+// Usato per derivare un endpoint /health dal URL aggregator self-hostato
+// (es. COMET_URL=http://127.0.0.1:8000/eyJ... → http://127.0.0.1:8000/health).
+function _statusHostFromUrl(fullUrl, healthPath) {
+  if (!fullUrl) return null;
+  try {
+    const u = new URL(fullUrl);
+    return `${u.protocol}//${u.host}${healthPath}`;
+  } catch (_) {
+    return null;
+  }
+}
 async function pingHost(name, url, timeoutMs = 3500) {
   const t0 = Date.now();
   try {
@@ -805,10 +817,18 @@ app.get('/api/status', async (req, res) => {
     pingHost('GuardaSerie', 'https://v.vidxgo.co/t/1375666'),
     pingHost('StreamingCommunity', `${SC_UPSTREAM}/`),
     // === Aggregator esterni (cache check Torbox/RD) ===
+    // Quando self-hostiamo l'upstream sulla nostra VPS (env var settata), il
+    // ping va al container locale via /health invece che all'istanza pubblica.
+    // Così il badge "online" nella pagina rispecchia il vero stato del backend
+    // che Pezzottio sta effettivamente chiamando.
     pingHost('Torrentio', 'https://torrentio.strem.fun/manifest.json'),
-    pingHost('MediaFusion', 'https://mediafusionfortheweebs.midnightignite.me/'),
-    pingHost('Comet', 'https://comet.feels.legal/'),
-    pingHost('StremThru', 'https://stremthru.13377001.xyz/'),
+    pingHost('MediaFusion', process.env.MEDIAFUSION_HOST
+      ? `${process.env.MEDIAFUSION_HOST.replace(/\/$/, '')}/health`
+      : 'https://mediafusionfortheweebs.midnightignite.me/'),
+    pingHost('Comet', _statusHostFromUrl(process.env.COMET_URL, '/health')
+      || 'https://comet.feels.legal/'),
+    pingHost('StremThru', _statusHostFromUrl(process.env.STREMTHRU_URL, '/v0/health')
+      || 'https://stremthru.13377001.xyz/'),
     pingHost('Meteor', 'https://meteorfortheweebs.midnightignite.me/'),
     // === Scraper torrent diretti (search.js) ===
     pingHost('Knaben', 'https://api.knaben.org/v1'),
