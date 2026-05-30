@@ -31,7 +31,7 @@ const manifest = {
   id: 'org.pezzottio.addon',
   version: require('../package.json').version,
   name: 'PEZZOTTIO',
-  description: 'Lo streaming italiano senza menate. Cerca film, serie e anime su 30+ tracker e mette sempre in cima l\'audio italiano. Integrazione con Torbox per riproduzione istantanea. Proxy HLS integrato server-side: niente MediaFlowProxy, niente Docker, niente VPS da configurare. Setup in 30 secondi. Powered by community Stremio addons (StremThru by Munif, Comet by Goldy, MediaFusion & Meteor by Midnight) — full credits in the GitHub README.',
+  description: 'Film, serie e anime con audio italiano sempre in cima. 30+ fonti, Real-Debrid & Torbox, proxy HLS integrato (niente Docker/VPS). Cataloghi Netflix, Prime, Disney+, Sky e altri nel Discover. Setup in 30s. 💬 Discord: https://discord.gg/Tpv3WMe77k',
   logo: `${PUBLIC_HOST}/logo.png`,
   background: `${PUBLIC_HOST}/background.png`,
   resources: ['stream', 'catalog', 'meta'],

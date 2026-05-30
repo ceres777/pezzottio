@@ -1645,6 +1645,10 @@ function serveManifest(req, res) {
         return newName ? { ...c, name: newName } : c;
       });
     }
+    // Lang EN: description tradotta (l'IT è il default nel manifest base).
+    if (lang === 'en') {
+      m.description = 'Movies, series & anime with English audio first. 30+ sources, Real-Debrid & Torbox, built-in HLS proxy (no Docker/VPS). Netflix, Prime, Disney+ & more catalogs in Discover. 30s setup. 💬 Discord: https://discord.gg/Tpv3WMe77k';
+    }
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Cache-Control', 'max-age=300, public');
     res.send(JSON.stringify(m));
