@@ -11,7 +11,8 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "changelog:post": "node scripts/changelog-discord.js",
-    "changelog:dry": "node scripts/changelog-discord.js --dry-run"
+    "changelog:dry": "node scripts/changelog-discord.js --dry-run",
+    "status:post": "node scripts/status-discord.js"
   },
   "dependencies": {
     "cycletls": "^2.0.5",

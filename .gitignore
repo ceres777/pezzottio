@@ -12,5 +12,7 @@ assets/anime-mapping.json
 # scripts/ ignorato in blocco (file local), eccetto i tool versionati
 scripts/*
 !scripts/changelog-discord.js
-# stato runtime del poster Discord (date già postate) — mai committare
+!scripts/status-discord.js
+# stato runtime dei poster Discord — mai committare
 scripts/.changelog-posted.json
+scripts/.status-message-id.json
