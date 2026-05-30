@@ -158,7 +158,9 @@ Sì, ora è supportato con cache check via batch endpoint (niente più rate-limi
 <details>
 <summary><b>Devo ospitare qualcosa (MediaFlowProxy, Docker, VPS)?</b></summary>
 
-No. Tutto è nel server pubblico di Pezzottio. Tu apri il link, copi in Stremio, fine.
+No, per usare Pezzottio non devi self-hostare nulla. L'**HLS proxy** per StreamingCommunity, VidXgo, AnimeWorld/Saturn/Unity (che normalmente richiederebbero MediaFlowProxy) gira nel nostro server pubblico.
+
+**Disclaimer di onestà:** la modalità predefinita di Pezzottio chiama in parallelo le istanze pubbliche di alcuni addon community-mantenuti (StremThru di Munif, Comet di Goldy, MediaFusion + Meteor di Midnight) per arricchire il pool di torrent. Quelle istanze non sono nostre — sono servizi gratuiti gestiti dai rispettivi maintainer. Se vuoi alleggerire il loro carico puoi self-hostare gli upstream con Docker (sono tutti open-source) e configurare le tue URL via env var — vedi la sezione [Self-hosting](#%EF%B8%8F-self-hosting-for-power-users) sotto.
 </details>
 
 <details>
@@ -199,21 +201,58 @@ Telegram: [**@Mbhere1**](https://t.me/Mbhere1). Scrivimi con titolo + screenshot
 
 ---
 
+## 🤝 Credits / Upstream services
+
+Pezzottio's `/stream` resolver, in its default configuration, fans out requests in parallel to several community-maintained Stremio addons to enrich the torrent pool. **These instances are NOT ours** — they are free public services generously provided by their respective authors. All credit and gratitude goes to them.
+
+| Upstream | Maintainer | Default instance | Repo |
+|---|---|---|---|
+| **StremThru** | [Munif](https://github.com/MunifTanjim) | `stremthru.13377001.xyz` | [github.com/MunifTanjim/stremthru](https://github.com/MunifTanjim/stremthru) |
+| **Comet** | [Goldy / G0ldyy](https://github.com/g0ldyy) | `comet.feels.legal` | [github.com/g0ldyy/comet](https://github.com/g0ldyy/comet) |
+| **MediaFusion** | [Midnight](https://github.com/mhdzumair) | `mediafusionfortheweebs.midnightignite.me` | [github.com/mhdzumair/MediaFusion](https://github.com/mhdzumair/MediaFusion) |
+| **Meteor** | [Midnight](https://github.com/mhdzumair) | `meteorfortheweebs.midnightignite.me` | [github.com/mhdzumair/MediaFusion](https://github.com/mhdzumair/MediaFusion) |
+| **Torrentio** | [Bogdan89](https://github.com/Bogdan89) (operator) | `torrentio.strem.fun` | [github.com/Stremio/stremio-addon-torrentio](https://github.com/Stremio/stremio-addon-torrentio) |
+
+Catalog data for the Pezzottio Extra catalog (streaming platform sections like Netflix / Prime / Disney+ etc.) is fetched directly from the **public [TMDB API](https://developer.themoviedb.org/)** — no AIOMetadata / external metadata proxy. Anime metadata comes from **[Kitsu API](https://kitsu.docs.apiary.io/)**.
+
+If you're running an instance and want us off your servers, just open an issue — we'll switch defaults or remove. We're also working on self-hosting these upstreams ourselves to reduce load.
+
+---
+
 ## 🛠️ Self-hosting (for power users)
 
-If you want to host your own copy (useful for max privacy or heavy users):
+If you want to host your own copy (useful for max privacy, heavy users, or to take load off the community upstreams):
 
 ```bash
 git clone https://github.com/ceres777/pezzottio.git
 cd pezzottio
 npm install
-cp .env.example .env  # fill in your debrid keys
+cp .env.example .env  # fill in your debrid keys + (optional) upstream URLs
 npm start
 ```
 
 Open `http://127.0.0.1:7001/configure` (IT) or `/configure-en` (EN).
 
 Free deploy on Render: the repo includes `render.yaml`. Fork → New Web Service → Deploy.
+
+### Self-hosting the upstream community addons (recommended for heavy users)
+
+Pezzottio defaults to the public instances listed above, but you can override each one via env vars to point at your own private instance:
+
+```bash
+# In .env — leave blank to keep the community default, or set your own URL
+TORRENTIO_URL=https://my-torrentio.example.com/providers=yts,eztv,...
+COMET_URL=https://my-comet.example.com/eyJ...config-base64...
+COMET_URL_EN=...                           # same with EN-language filter
+STREMTHRU_URL=https://my-stremthru.example.com/stremio/torz/eyJ...
+STREMTHRU_URL_EN=...
+MEDIAFUSION_URL=https://my-mediafusion.example.com/encrypted-token
+MEDIAFUSION_HOST=https://my-mediafusion.example.com
+METEOR_URL=https://my-meteor.example.com/eyJ...
+METEOR_URL_EN=...
+```
+
+Each upstream has its own Docker / install guide on the repo linked in the Credits table. **StremThru** and **Comet** are the lightest (~50-150 MB RAM each) and the most worth self-hosting if you have spare infra — they cover ~90% of what `/stream` needs.
 
 ---
 
@@ -241,6 +280,8 @@ Free deploy on Render: the repo includes `render.yaml`. Fork → New Web Service
 **6. Third-Party Services and Trademarks.** The Software interacts with third-party services and APIs operated by independent entities ("Third-Party Services"), including but not limited to debrid services, metadata providers, public torrent indexers, and streaming sites. The Author has no affiliation, sponsorship, partnership, endorsement, license, or commercial relationship with any of these Third-Party Services unless explicitly stated. All trademarks, service marks, trade names, product names, logos, and brand identifiers referenced in the Software, the documentation, the configuration interfaces, or any associated materials are and remain the exclusive property of their respective owners. References are used solely for descriptive, identifying, and interoperability purposes and do not imply any endorsement, affiliation, or sponsorship. The User is responsible for complying with the Terms of Service of each Third-Party Service the User chooses to use.
 
 **7. No Content Hosting; Compliance Procedure.** The Author does not host, control, edit, or monitor the content available through Third-Party Services. The Software performs purely transient technical operations (caching, transcoding hints, segment proxying) that fall within recognized safe-harbor provisions of applicable law, including, where applicable, the EU Directive on Electronic Commerce (2000/31/EC), the EU Digital Services Act (Regulation (EU) 2022/2065), the United States Digital Millennium Copyright Act (17 U.S.C. § 512), and analogous national implementing legislation. Should any rights holder believe that the Software, in its source code, default configuration, or documentation, facilitates infringement of their rights, they are invited to submit a written, substantiated, and legally compliant notice to the maintainer contact listed in this repository. The Author reserves the right to remove, disable, modify, or amend any component of the Software upon receipt of a valid notice.
+
+**7-bis. Default Upstream Community Addons.** In its default configuration, the Software's `/stream` resolver issues parallel HTTP requests to several public instances of community-maintained Stremio addons in order to enrich the torrent pool: **StremThru** (default endpoint `https://stremthru.13377001.xyz`, maintained by Munif Tanjim), **Comet** (default endpoint `https://comet.feels.legal`, maintained by Goldy/g0ldyy), **MediaFusion** and **Meteor** (default endpoints under `*.midnightignite.me`, maintained by Midnight/mhdzumair), and **Torrentio** (default endpoint `https://torrentio.strem.fun`). These instances are free public services generously made available by their respective maintainers; the Author has no affiliation, partnership, sponsorship, or commercial relationship with them, has not requested authorization for the volume of traffic generated by the public Pezzottio instance, and acknowledges that such usage is undertaken at the discretion and tolerance of the upstream maintainers. Each upstream endpoint is overridable via environment variable (`STREMTHRU_URL`, `COMET_URL`, `COMET_URL_EN`, `MEDIAFUSION_URL`, `MEDIAFUSION_HOST`, `METEOR_URL`, `METEOR_URL_EN`, `TORRENTIO_URL`); self-hosting users are strongly encouraged to deploy their own private instances of these upstream addons (all of which are open-source) rather than relying on the community defaults. Should any upstream maintainer wish to be removed from the default configuration, a notice opened on the repository issue tracker shall be honored promptly. Full credits and links to each upstream project are provided in the "Credits / Upstream services" section of this repository's README.
 
 **8. No Storage of User Data.** The publicly hosted instance of the Software, if and when available, does not persist user credentials, debrid API keys, IP addresses, viewing history, watchlists, or any other personally identifiable information in a database. Debrid keys and configuration parameters are encoded inside the User's personal addon URL and exist only therein. No telemetry, advertising, third-party tracker, or analytics is integrated into the Software. The Author reserves the right to retain transient operational logs (request paths, timestamps, status codes, error traces) strictly for the purpose of preserving service stability, diagnosing technical malfunctions, and preventing abuse, with such logs being rotated and discarded according to a short retention policy.
 
@@ -277,6 +318,8 @@ Free deploy on Render: the repo includes `render.yaml`. Fork → New Web Service
 **6. Servizi di Terze Parti e Marchi.** Il Software interagisce con servizi e API gestiti da soggetti indipendenti ("Servizi di Terze Parti"), inclusi a titolo esemplificativo servizi di debrid, fornitori di metadati, indici di torrent pubblici e siti di streaming. L'Autore non ha alcun rapporto di affiliazione, sponsorizzazione, partnership, endorsement, licenza o relazione commerciale con tali Servizi di Terze Parti, salvo ove espressamente dichiarato. Tutti i marchi, marchi di servizio, denominazioni commerciali, nomi di prodotto, loghi e segni distintivi citati nel Software, nella documentazione, nelle interfacce di configurazione o nei materiali correlati sono di proprietà esclusiva dei rispettivi titolari. Tali riferimenti sono utilizzati esclusivamente per finalità descrittive, identificative e di interoperabilità tecnica e non implicano alcun endorsement, affiliazione o sponsorizzazione. L'Utente è responsabile del rispetto dei Termini di Servizio di ciascun Servizio di Terze Parti del quale decida di avvalersi.
 
 **7. Assenza di Hosting di Contenuti; Procedura di Conformità.** L'Autore non ospita, non controlla, non modifica e non monitora i contenuti accessibili tramite i Servizi di Terze Parti. Il Software esegue operazioni tecniche di natura transitoria (caching, suggerimenti di transcodifica, proxy di segmenti) che ricadono nelle previsioni di esonero da responsabilità riconosciute dalla normativa applicabile, ivi incluse, ove applicabili, le disposizioni della Direttiva 2000/31/CE sul commercio elettronico, del Regolamento (UE) 2022/2065 (Digital Services Act), e della corrispondente normativa nazionale di recepimento (D.Lgs. 70/2003 e successive modifiche). Qualora un titolare di diritti ritenga che il Software, nel suo codice sorgente, nella configurazione predefinita o nella documentazione, agevoli la violazione dei propri diritti, è invitato a trasmettere una notifica scritta, motivata e conforme ai requisiti di legge al contatto del manutentore indicato nel presente repository. L'Autore si riserva il diritto di rimuovere, disabilitare, modificare o emendare qualsiasi componente del Software a fronte del ricevimento di una notifica valida.
+
+**7-bis. Addon di Comunità Predefiniti come Upstream.** Nella propria configurazione predefinita, il resolver `/stream` del Software invia richieste HTTP in parallelo verso diverse istanze pubbliche di addon Stremio mantenuti dalla comunità, al fine di arricchire il pool di torrent: **StremThru** (endpoint predefinito `https://stremthru.13377001.xyz`, mantenuto da Munif Tanjim), **Comet** (endpoint predefinito `https://comet.feels.legal`, mantenuto da Goldy/g0ldyy), **MediaFusion** e **Meteor** (endpoint predefiniti sotto `*.midnightignite.me`, mantenuti da Midnight/mhdzumair), e **Torrentio** (endpoint predefinito `https://torrentio.strem.fun`). Tali istanze sono servizi pubblici gratuiti generosamente messi a disposizione dai rispettivi manutentori; l'Autore non ha alcuna affiliazione, partnership, sponsorizzazione o relazione commerciale con essi, non ha richiesto autorizzazione per il volume di traffico generato dall'istanza pubblica di Pezzottio, e riconosce che tale utilizzo è subordinato alla discrezione e tolleranza dei manutentori upstream. Ciascun endpoint upstream è sovrascrivibile tramite variabile d'ambiente (`STREMTHRU_URL`, `COMET_URL`, `COMET_URL_EN`, `MEDIAFUSION_URL`, `MEDIAFUSION_HOST`, `METEOR_URL`, `METEOR_URL_EN`, `TORRENTIO_URL`); gli utenti che fanno self-hosting sono fortemente incoraggiati a deployare le proprie istanze private di tali addon upstream (tutti open-source) anziché affidarsi ai default di comunità. Qualora un manutentore upstream desideri essere rimosso dalla configurazione predefinita, una segnalazione aperta sull'issue tracker del repository sarà onorata tempestivamente. Crediti completi e link a ciascun progetto upstream sono forniti nella sezione "Credits / Upstream services" del README di questo repository.
 
 **8. Assenza di Conservazione dei Dati dell'Utente.** L'istanza pubblicamente ospitata del Software, ove disponibile, non conserva su database credenziali utente, chiavi API di debrid, indirizzi IP, cronologie di visualizzazione, watchlist o qualsivoglia altra informazione personalmente identificabile. Le chiavi di debrid e i parametri di configurazione sono codificati all'interno dell'URL personale dell'addon dell'Utente ed esistono unicamente lì. Nessun sistema di telemetria, pubblicità, tracker di terze parti o analitica è integrato nel Software. L'Autore si riserva la facoltà di conservare log operativi transitori (percorsi delle richieste, timestamp, codici di stato, tracce di errore) esclusivamente al fine di preservare la stabilità del servizio, diagnosticare malfunzionamenti tecnici e prevenire abusi, con politica di rotazione e cancellazione a breve termine.
 
