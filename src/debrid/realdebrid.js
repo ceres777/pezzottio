@@ -596,30 +596,34 @@ const RD_CACHE_API = process.env.RD_CACHE_API || 'http://158.101.170.131:8321';
 const _findCachedCache = new Map(); // key: kind:tmdb:s:e → { v, t }
 const _FIND_TTL = 5 * 60 * 1000; // 5 min
 
-// Ritorna lista di torrent CACHED-RD pronti da servire.
+// Ritorna lista di torrent CACHED-{debrid} pronti da servire.
+// `debrid` può essere 'rd' (default, backward compat) o 'tb' — ICV supporta
+// entrambi e ritorna stesso schema con flag `cached_rd` o `cached_tb`.
 // Per i film: ogni entry ha {hash, magnet, title, size, seeders, is_pack}.
 // Per le serie: ogni entry ha anche {file: {title, size, file_index, rd_link_index}}
-// pre-mappato (l'API risolve già file index + RD link index per l'episodio).
-async function findCachedByTmdb(tmdbId, season, episode, isMovie) {
+// pre-mappato (l'API risolve già file index + link index per l'episodio).
+async function findCachedByTmdb(tmdbId, season, episode, isMovie, debrid = 'rd') {
   if (!tmdbId) return [];
   const kind = isMovie ? 'movie' : 'tv';
   const qid = isMovie ? String(tmdbId) : `${tmdbId}:${season || 1}:${episode || 1}`;
-  const ckey = `${kind}:${qid}`;
+  // Cache key separata per debrid (pool TB e RD sono diversi anche per stesso titolo).
+  const ckey = `${kind}:${qid}:${debrid}`;
   const hit = _findCachedCache.get(ckey);
   if (hit && Date.now() - hit.t < _FIND_TTL) return hit.v;
   try {
-    const url = `${RD_CACHE_API}/${kind}?tmdb_id=${encodeURIComponent(qid)}&debrid=rd`;
+    const url = `${RD_CACHE_API}/${kind}?tmdb_id=${encodeURIComponent(qid)}&debrid=${debrid}`;
     const r = await fetch(url, { timeout: 5000 });
     if (!r.ok) {
-      console.error(`[RD cache-api] ${kind}/${qid} -> ${r.status}`);
+      console.error(`[ICV ${debrid}] ${kind}/${qid} -> ${r.status}`);
       return [];
     }
     const data = await r.json();
     const results = Array.isArray(data?.results) ? data.results : [];
-    // Solo cached_rd: true. Estrai hash dal magnet btih.
+    // Filtra per cached_{debrid}: true.
+    const cachedFlag = `cached_${debrid}`;
     const out = [];
     for (const r of results) {
-      if (!r.cached_rd) continue;
+      if (!r[cachedFlag]) continue;
       const hashM = String(r.magnet || '').match(/btih:([a-fA-F0-9]{40}|[a-zA-Z2-7]{32})/i);
       if (!hashM) continue;
       out.push({
@@ -635,7 +639,7 @@ async function findCachedByTmdb(tmdbId, season, episode, isMovie) {
     _findCachedCache.set(ckey, { v: out, t: Date.now() });
     return out;
   } catch (e) {
-    console.error(`[RD cache-api] ${kind}/${qid} ERR:`, e.message);
+    console.error(`[ICV ${debrid}] ${kind}/${qid} ERR:`, e.message);
     return [];
   }
 }

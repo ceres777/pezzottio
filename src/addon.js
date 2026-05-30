@@ -671,23 +671,74 @@ builder.defineStreamHandler(async ({ type, id }) => {
     // publicHost già dichiarato in cima al handler (per gli HTTP stream URL)
 
     // Resolver per Torbox: batch checkcached (1 request) → URL lazy /play.
+    // Pool combinato:
+    //   1) candidates raccolti da searchExternal + scraper interni → checkCachedBatch TB
+    //   2) ICV (italo-centrico) con debrid=tb → torrent pre-flaggati cached_tb da ICV
+    //      (saltiamo il check live perché ICV già lo fa server-side, refresh frequente).
     async function resolveTorbox(prov) {
       const hashes = candidates.map((c) => c.infoHash);
-      const cachedMap = await prov.checkCachedBatch(hashes).catch(() => new Map());
+      // Pool 1 + Pool 2 in parallelo per ridurre latency.
+      const [cachedMap, icvCached] = await Promise.all([
+        prov.checkCachedBatch(hashes).catch(() => new Map()),
+        (async () => {
+          if (!imdbId) return [];
+          try {
+            const sc = require('./providers/streamingcommunity');
+            const tmdbId = await Promise.race([
+              sc.imdbToTmdb(imdbId, isMovie ? 'movie' : 'tv').catch(() => null),
+              new Promise((r) => setTimeout(() => r(null), 1500)),
+            ]);
+            if (!tmdbId) return [];
+            const rdMod = require('./debrid/realdebrid');
+            return await Promise.race([
+              rdMod.findCachedByTmdb(tmdbId, meta.season, meta.episode, isMovie, 'tb').catch(() => []),
+              new Promise((r) => setTimeout(() => r([]), 2000)),
+            ]);
+          } catch (_) { return []; }
+        })(),
+      ]);
+      console.log(`[TB] external-cached=${[...cachedMap.values()].filter(Boolean).length} icv-cached=${icvCached.length}`);
+
       const out = [];
+      const seenHashes = new Set();
+
+      // Pool 1: candidates verificati live con TB checkCachedBatch.
       for (const c of candidates) {
         if (out.length >= maxResults) break;
         const cached = cachedMap.get(c.infoHash);
         if (!cached) continue;
         if (c.seasonPack && meta.season && meta.episode) {
-          // Per anime via Kitsu (season=1, episode=absolute), passa anche meta.episode
-          // come absoluteEpisode → match pattern "One Piece - 1163.mkv" nei pack.
           const absFallback = (isAnime && (meta.season == null || meta.season <= 1)) ? meta.episode : meta.absoluteEpisode;
           const fileMatch = findFileForEpisode(cached.files || [], meta.season, meta.episode, absFallback);
           if (!fileMatch) continue;
         }
+        seenHashes.add(c.infoHash);
         const url = `${publicHost}/${cfgB64}/play/${c.infoHash}${sePart}${iPart}`;
         out.push(formatStream(c, prov.name, url));
+      }
+
+      // Pool 2: ICV cached_tb (skip se l'hash è già stato emesso dal pool 1).
+      for (const ic of icvCached) {
+        if (out.length >= maxResults) break;
+        if (seenHashes.has(ic.hash)) continue;
+        seenHashes.add(ic.hash);
+        const text = `${ic.title || ''} ${(ic.file && ic.file.title) || ''}`;
+        const candidateLike = {
+          title: ic.title || '',
+          infoHash: ic.hash,
+          magnet: ic.magnet,
+          seeds: ic.seeders || 0,
+          sizeText: null,
+          quality: parseQuality(text),
+          provider: 'ICV',
+          italian: isItalian(text),
+          italianSub: hasItalianSub(text),
+          english: isEnglish(text),
+          englishSub: hasEnglishSub(text),
+          filename: (ic.file && ic.file.title) || null,
+        };
+        const url = `${publicHost}/${cfgB64}/play/${ic.hash}${sePart}${iPart}`;
+        out.push(formatStream(candidateLike, prov.name, url));
       }
       return out;
     }
@@ -862,14 +913,18 @@ builder.defineStreamHandler(async ({ type, id }) => {
     // L'utente che ha sia RD che TB vede risultati da entrambi.
     console.log(`[debug] providers configured: ${providers.map((p) => p.name).join(',') || '(none)'}`);
 
-    // Resolver RD per lang=en: il backend ICV (resolveRealDebrid) è italo-centrico
-    // → pochi hash per film USA. Bypass: prendiamo i candidates già marcati
-    // rdCached=true dagli external addons (Torrentio/Comet/MediaFusion/StremThru/
-    // Meteor) che fanno cache check RD nativo via |realdebrid=KEY upstream.
-    // Risultato: tutti gli stream RD-cached vengono mostrati come "Pezzottio RD".
-    function resolveRealDebridEN() {
+    // Resolver RD dai candidates già marcati rdCached=true dagli external addons
+    // (Torrentio/Comet/MediaFusion/StremThru/Meteor che fanno cache check RD nativo
+    // via key RD iniettata upstream). Lang-neutral: il pool `candidates` è già
+    // filtrato per lingua a monte (_buildBaseUrl usa baseUrlEN se lang='en'), quindi
+    // i flag italian/english su ogni candidato sono coerenti col profilo.
+    // Per IT + fullIta: tiene solo i candidati con audio ITA confermato.
+    function resolveRealDebridFromCandidates() {
       const out = [];
-      for (const c of candidates) {
+      const pool = (lang !== 'en' && fullIta)
+        ? candidates.filter((c) => c.italian)
+        : candidates;
+      for (const c of pool) {
         if (out.length >= maxResults) break;
         if (!c.rdCached) continue;
         const q = new URLSearchParams();
@@ -880,28 +935,50 @@ builder.defineStreamHandler(async ({ type, id }) => {
         const url = `${publicHost}/${cfgB64}/play/${c.infoHash}?${q.toString()}`;
         out.push(formatStream(c, 'RD', url));
       }
-      console.log(`[RD EN] ${imdbId || '?'} candidates ${candidates.length} → cached ${out.length}`);
+      console.log(`[RD cand] ${imdbId || '?'} lang=${lang} candidates ${candidates.length} → rdCached ${out.length}`);
       return out;
+    }
+
+    // Estrae l'infoHash dall'URL /play/<hash>?... per dedup cross-pool.
+    function _hashFromPlayUrl(u) {
+      const m = String(u || '').match(/\/play\/([a-z0-9]{32,40})\b/i);
+      return m ? m[1].toLowerCase() : null;
+    }
+    // Fonde pool ICV + pool candidates dedup-ando per hash. ICV ha priorità
+    // (file_index/rd_link_index pre-mappati → playback pack più affidabile),
+    // i candidates aggiungono solo gli hash che ICV non aveva.
+    function mergeRdPools(icvStreams, candidateStreams) {
+      const seen = new Set();
+      const merged = [];
+      for (const s of icvStreams) {
+        const h = _hashFromPlayUrl(s.url);
+        if (h) seen.add(h);
+        merged.push(s);
+      }
+      for (const s of candidateStreams) {
+        const h = _hashFromPlayUrl(s.url);
+        if (h && seen.has(h)) continue;
+        if (h) seen.add(h);
+        merged.push(s);
+      }
+      return merged;
     }
 
     const providerResults = await Promise.all(providers.map((prov) => {
       if (prov.name === 'TB') return resolveTorbox(prov).catch((e) => { console.error('[TB] resolve threw:', e.message); return []; });
       if (prov.name === 'RD') {
-        // EN: fonde external addons (rdCached) + backend ICV. ICV è italo-centrico
-        // ma molti torrent multi-lingua hanno track EN; serve come fallback quando
-        // gli external addons EN sono rate-limited (Comet 429, StremThru timeout).
-        // Dedup successiva per URL elimina i doppioni.
-        if (lang === 'en') {
-          return Promise.all([
-            Promise.resolve(resolveRealDebridEN()),
-            resolveRealDebrid(prov).catch((e) => { console.error('[RD EN icv] threw:', e.message); return []; }),
-          ]).then(([fromExternals, fromIcv]) => {
-            const merged = [...fromExternals, ...fromIcv];
-            console.log(`[RD EN merge] ${imdbId || '?'} external=${fromExternals.length} icv=${fromIcv.length} total=${merged.length}`);
-            return merged;
-          });
-        }
-        return resolveRealDebrid(prov).catch((e) => { console.error('[RD] resolve threw:', e.message, '\n', e.stack); return []; });
+        // Sia IT che EN: fonde ICV (italo-centrico, file_index pre-mappato) +
+        // candidates.rdCached (StremThru/Comet/MediaFusion self-hostati + Torrentio).
+        // Prima IT usava SOLO ICV → buco di copertura sui titoli che ICV non ha.
+        // Ora simmetrico con EN: ICV first (più affidabile), candidates riempiono i gap.
+        return Promise.all([
+          resolveRealDebrid(prov).catch((e) => { console.error('[RD icv] threw:', e.message); return []; }),
+          Promise.resolve(resolveRealDebridFromCandidates()),
+        ]).then(([fromIcv, fromCandidates]) => {
+          const merged = mergeRdPools(fromIcv, fromCandidates);
+          console.log(`[RD merge] ${imdbId || '?'} lang=${lang} icv=${fromIcv.length} candidates=${fromCandidates.length} merged=${merged.length}`);
+          return merged;
+        });
       }
       return Promise.resolve([]);
     }));
