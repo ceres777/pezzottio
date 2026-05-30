@@ -72,7 +72,7 @@ Tu apri il link, copi-incolli in Stremio, finito. Funziona uguale su PC, telefon
 
 Se non hai ancora Torbox, prendilo qui (costa pochi euro al mese, ti permette di scaricare e riprodurre torrent istantaneamente dal cloud, senza saturare la tua connessione):
 
-### 💎 [**Registrati a Torbox →**](https://torbox.app/subscription?referral=8250a966-1950-4684-973b-cd4e181b56ad)
+### 💎 [**Registrati a Torbox →**](https://torbox.app/subscription)
 
 > Usando il link sopra supporti lo sviluppo di Pezzottio (a te non costa nulla in più). Grazie!
 
@@ -186,7 +186,7 @@ MIT. Vedi [`LICENSE`](LICENSE).
 
 ### 🔗 [pezz8io.dpdns.org/configure](https://pezz8io.dpdns.org/configure)
 
-### 💎 [Registrati a Torbox](https://torbox.app/subscription?referral=8250a966-1950-4684-973b-cd4e181b56ad)
+### 💎 [Registrati a Torbox](https://torbox.app/subscription)
 
 <sub>Open source · MIT · Realizzato in 🇮🇹 · Supporto Telegram [@Mbhere1](https://t.me/Mbhere1)</sub>
 

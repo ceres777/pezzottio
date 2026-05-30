@@ -604,7 +604,7 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
           <div class="text-xs text-zinc-400 leading-relaxed">
             Non hai ancora Torbox? <strong class="text-white">Pochi euro al mese</strong>, libreria infinita, zero attese.
           </div>
-          <a href="https://torbox.app/subscription?referral=8250a966-1950-4684-973b-cd4e181b56ad" target="_blank" rel="noopener"
+          <a href="https://torbox.app/subscription" target="_blank" rel="noopener"
             class="btn-primary inline-flex items-center gap-2 px-4 py-2 rounded text-xs uppercase whitespace-nowrap">
             💎 Registrati a Torbox
           </a>
@@ -1038,7 +1038,7 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
             Supporto @Mbhere1
           </a>
           <span class="text-zinc-700">·</span>
-          <a href="https://torbox.app/subscription?referral=8250a966-1950-4684-973b-cd4e181b56ad" target="_blank" rel="noopener" class="hover:text-white transition">
+          <a href="https://torbox.app/subscription" target="_blank" rel="noopener" class="hover:text-white transition">
             💎 Torbox
           </a>
           <span class="text-zinc-700">·</span>
