@@ -272,11 +272,11 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
     <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3 text-sm">
       <span class="text-base">🚨</span>
       <div class="flex-1 text-zinc-200">
-        <span class="font-semibold text-red-400 mr-2">Avviso:</span>
+        <span class="font-semibold text-red-400 mr-2">Notice:</span>
         <span id="notice-msg"></span>
       </div>
-      <a href="/changelog" class="text-xs text-zinc-400 hover:text-white whitespace-nowrap">dettagli →</a>
-      <button id="notice-close" class="text-zinc-500 hover:text-white text-xl leading-none ml-2" aria-label="Chiudi">×</button>
+      <a href="/changelog?lang=en" class="text-xs text-zinc-400 hover:text-white whitespace-nowrap">details →</a>
+      <button id="notice-close" class="text-zinc-500 hover:text-white text-xl leading-none ml-2" aria-label="Close">×</button>
     </div>
   </div>
 
@@ -1049,7 +1049,7 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
             GitHub
           </a>
           <span class="text-zinc-700">·</span>
-          <a href="/changelog" class="hover:text-white transition flex items-center gap-1.5">
+          <a href="/changelog?lang=en" class="hover:text-white transition flex items-center gap-1.5">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 2M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round"/></svg>
             <span id="last-update-text">Changelog</span>
           </a>
@@ -1092,7 +1092,7 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
     // dismissable e ricordato in localStorage per non rompere le palle).
     async function loadNotice() {
       try {
-        const r = await fetch('/api/notice');
+        const r = await fetch('/api/notice?lang=en');
         const d = await r.json();
         if (!d.notice) return;
         const dismissKey = 'pz-notice-' + (d.notice.date || '') + ':' + (d.notice.msg || '').slice(0, 32);
@@ -1119,7 +1119,7 @@ function render({ base, rd, tb, order, aios, style, onlyTorrent, filter, fullIta
     }
     async function loadLastUpdate() {
       try {
-        const r = await fetch('/api/changelog');
+        const r = await fetch('/api/changelog?lang=en');
         const d = await r.json();
         const first = (d.entries || [])[0];
         if (first?.date) {

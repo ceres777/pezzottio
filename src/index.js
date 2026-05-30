@@ -1086,13 +1086,28 @@ function loadChangelog() {
   return _changelogCache;
 }
 
+// Helper: rimappa entries usando msg_en quando ?lang=en, fallback msg italiano
+// se la traduzione manca su una entry specifica.
+function _localizeChangelog(log, lang) {
+  if (lang !== 'en') return log;
+  return log.map((group) => ({
+    ...group,
+    items: (group.items || []).map((it) => ({
+      ...it,
+      msg: it.msg_en || it.msg,
+    })),
+  }));
+}
+
 app.get('/api/changelog', (req, res) => {
-  res.json({ entries: loadChangelog() });
+  const lang = req.query.lang === 'en' ? 'en' : 'it';
+  res.json({ entries: _localizeChangelog(loadChangelog(), lang) });
 });
 
 // Notice: ultima entry 'breaking' negli ultimi 7 giorni (banner in /configure).
 // L'utente può dismissare e non riapparirà finché non c'è una nuova breaking.
 app.get('/api/notice', (req, res) => {
+  const lang = req.query.lang === 'en' ? 'en' : 'it';
   const log = loadChangelog();
   const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
   for (const group of log) {
@@ -1100,7 +1115,8 @@ app.get('/api/notice', (req, res) => {
     if (isNaN(groupTime) || groupTime < weekAgo) continue;
     const breakingItem = (group.items || []).find((it) => it.type === 'breaking');
     if (breakingItem) {
-      return res.json({ notice: { date: group.date, msg: breakingItem.msg } });
+      const msg = lang === 'en' ? (breakingItem.msg_en || breakingItem.msg) : breakingItem.msg;
+      return res.json({ notice: { date: group.date, msg } });
     }
   }
   res.json({ notice: null });
@@ -1113,38 +1129,52 @@ const TYPE_META = {
   perf:     { icon: '🚀', label: 'Perf',   color: '#f59e0b' },
   breaking: { icon: '🚨', label: 'Breaking', color: '#ef4444' },
 };
+const TYPE_META_EN = {
+  feat:     { icon: '✨', label: 'New',      color: '#22c55e' },
+  fix:      { icon: '🛠️', label: 'Fix',      color: '#3b82f6' },
+  config:   { icon: '⚙️', label: 'Setup',    color: '#a855f7' },
+  perf:     { icon: '🚀', label: 'Perf',     color: '#f59e0b' },
+  breaking: { icon: '🚨', label: 'Breaking', color: '#ef4444' },
+};
 
 app.get('/changelog', (req, res) => {
+  const lang = req.query.lang === 'en' ? 'en' : 'it';
+  const meta = lang === 'en' ? TYPE_META_EN : TYPE_META;
   const log = loadChangelog();
   const groups = log.map((g) => {
     const items = (g.items || []).map((it) => {
-      const m = TYPE_META[it.type] || TYPE_META.feat;
+      const m = meta[it.type] || meta.feat;
+      const msg = lang === 'en' ? (it.msg_en || it.msg) : it.msg;
       return `<li class="flex items-start gap-3 py-2.5">
         <span class="shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide" style="background:${m.color}20;color:${m.color};border:1px solid ${m.color}40">
           ${m.icon} ${m.label}
         </span>
-        <span class="text-sm text-zinc-200 leading-relaxed">${String(it.msg).replace(/</g,'&lt;')}</span>
+        <span class="text-sm text-zinc-200 leading-relaxed">${String(msg).replace(/</g,'&lt;')}</span>
       </li>`;
     }).join('');
-    const date = new Date(g.date).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
+    const date = new Date(g.date).toLocaleDateString(lang === 'en' ? 'en-US' : 'it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
     return `<section class="mb-10">
       <h2 class="text-sm uppercase tracking-wider text-zinc-500 font-semibold mb-3">📅 ${date}</h2>
       <ul class="space-y-1 border-l border-white/10 pl-5">${items}</ul>
     </section>`;
   }).join('');
 
+  const t = lang === 'en'
+    ? { back: '← Back to Pezzottio', backHref: '/configure-en', subtitle: 'What changed recently. Updated on every new deploy.', empty: 'No entries yet.' }
+    : { back: '← Torna a Pezzottio', backHref: '/configure', subtitle: 'Cosa è cambiato di recente. Aggiornato a ogni nuovo deploy.', empty: 'Nessuna entry ancora.' };
+
   res.type('html').send(`<!DOCTYPE html>
-<html lang="it"><head>
+<html lang="${lang}"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Changelog · Pezzottio</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>body{background:#000;color:#fff;font-family:-apple-system,system-ui,sans-serif}</style>
 </head><body>
 <div class="max-w-3xl mx-auto px-6 py-12">
-  <a href="/configure" class="text-zinc-500 text-sm hover:text-white inline-flex items-center gap-1">← Torna a Pezzottio</a>
+  <a href="${t.backHref}" class="text-zinc-500 text-sm hover:text-white inline-flex items-center gap-1">${t.back}</a>
   <h1 class="text-4xl font-extrabold mt-6 mb-2" style="color:#e50914">Changelog</h1>
-  <p class="text-zinc-400 text-sm mb-10">Cosa è cambiato di recente. Aggiornato a ogni nuovo deploy.</p>
-  ${groups || '<p class="text-zinc-500">Nessuna entry ancora.</p>'}
+  <p class="text-zinc-400 text-sm mb-10">${t.subtitle}</p>
+  ${groups || `<p class="text-zinc-500">${t.empty}</p>`}
 </div>
 </body></html>`);
 });
