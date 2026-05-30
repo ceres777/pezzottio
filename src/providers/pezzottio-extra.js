@@ -17,32 +17,36 @@ const IMG_BASE = 'https://image.tmdb.org/t/p';
 const TIMEOUT = 8000;
 const PAGE_SIZE = 20; // TMDB ritorna 20 per pagina
 
-// Provider IDs TMDB (https://api.themoviedb.org/3/watch/providers/movie?watch_region=US)
+// Provider IDs TMDB. NB: gli ID variano per region (es. Prime Video = 119 in IT,
+// 9 in US perché TMDB ha duplicato l'entry per il marketplace italiano). Lista
+// sempre aggiornabile via https://api.themoviedb.org/3/watch/providers/movie?watch_region=XX
+// Provider con tmdbId mancante per una region NON viene esposto in quella region.
 const PROVIDERS = {
-  netflix:     { tmdbId: 8,    label: 'Netflix' },
-  prime:       { tmdbId: 9,    label: 'Prime Video' },
-  disney:      { tmdbId: 337,  label: 'Disney+' },
-  apple:       { tmdbId: 350,  label: 'Apple TV+' },
-  hbomax:      { tmdbId: 1899, label: 'HBO Max' },
-  hulu:        { tmdbId: 15,   label: 'Hulu' },
-  discovery:   { tmdbId: 524,  label: 'Discovery+' },
-  starz:       { tmdbId: 43,   label: 'Starz' },
-  paramount:   { tmdbId: 531,  label: 'Paramount+' },
-  peacock:     { tmdbId: 386,  label: 'Peacock' },
-  skyshowtime: { tmdbId: 1773, label: 'SkyShowtime' },
-  crunchyroll: { tmdbId: 283,  label: 'Crunchyroll' },
+  netflix:     { tmdbId: { IT: 8,    US: 8 },    label: 'Netflix' },
+  prime:       { tmdbId: { IT: 119,  US: 9 },    label: 'Prime Video' },
+  disney:      { tmdbId: { IT: 337,  US: 337 },  label: 'Disney+' },
+  apple:       { tmdbId: { IT: 350,  US: 350 },  label: 'Apple TV+' },
+  hbomax:      { tmdbId: { IT: 1899, US: 1899 }, label: 'HBO Max' },
+  hulu:        { tmdbId: { US: 15 },             label: 'Hulu' },
+  discovery:   { tmdbId: { US: 520 },            label: 'Discovery+' },
+  starz:       { tmdbId: { US: 43 },             label: 'Starz' },
+  paramount:   { tmdbId: { IT: 531,  US: 2303 }, label: 'Paramount+' },
+  peacock:     { tmdbId: { US: 386 },            label: 'Peacock' },
+  // SkyShowtime esiste in EU (NL/SE/DK/ES/PT) ma NON in US su TMDB. Rimosso da CATALOGS_BY_REGION.US.
+  skyshowtime: { tmdbId: { IT: 1773 },           label: 'SkyShowtime' },
+  crunchyroll: { tmdbId: { IT: 283,  US: 283 },  label: 'Crunchyroll' },
   // IT-specific
-  nowtv:       { tmdbId: 39,   label: 'NOW TV' },
-  mediaset:    { tmdbId: 426,  label: 'Mediaset Infinity' },
-  raiplay:     { tmdbId: 261,  label: 'RaiPlay' },
-  timvision:   { tmdbId: 124,  label: 'TimVision' },
-  skygo:       { tmdbId: 130,  label: 'Sky Go' },
+  nowtv:       { tmdbId: { IT: 39 },             label: 'NOW TV' },
+  mediaset:    { tmdbId: { IT: 359 },            label: 'Mediaset Infinity' },
+  raiplay:     { tmdbId: { IT: 222 },            label: 'RaiPlay' },
+  timvision:   { tmdbId: { IT: 109 },            label: 'TimVision' },
+  skygo:       { tmdbId: { IT: 29 },             label: 'Sky Go' },
 };
 
-// Lista cataloghi per region
+// Lista cataloghi per region. Solo provider con tmdbId definito per quella region.
 const CATALOGS_BY_REGION = {
   IT: ['netflix', 'prime', 'disney', 'apple', 'hbomax', 'paramount', 'skygo', 'nowtv', 'mediaset', 'raiplay', 'timvision', 'crunchyroll'],
-  US: ['netflix', 'prime', 'disney', 'apple', 'hbomax', 'paramount', 'peacock', 'hulu', 'discovery', 'starz', 'skyshowtime', 'crunchyroll'],
+  US: ['netflix', 'prime', 'disney', 'apple', 'hbomax', 'paramount', 'peacock', 'hulu', 'discovery', 'starz', 'crunchyroll'],
 };
 
 // Generi TMDB Movie (https://api.themoviedb.org/3/genre/movie/list)
@@ -95,6 +99,8 @@ function buildManifest(region) {
   for (const key of provs) {
     const p = PROVIDERS[key];
     if (!p) continue;
+    // Safety: skippa provider che non hanno ID TMDB per questa region
+    if (!p.tmdbId || !p.tmdbId[region]) continue;
     const extra = [
       { name: 'genre', options: ALL_GENRE_NAMES, isRequired: false },
       { name: 'skip', isRequired: false },
@@ -213,10 +219,13 @@ async function fetchCatalog({ catalogId, region, language, extra }) {
   } else {
     const prov = PROVIDERS[provKey];
     if (!prov) return { metas: [] };
+    // Risolvi tmdbId per region (Prime IT=119, Prime US=9, etc.)
+    const tmdbId = prov.tmdbId && prov.tmdbId[region];
+    if (!tmdbId) return { metas: [] }; // provider non disponibile in questa region
     const qs = {
       language,
       watch_region: region,
-      with_watch_providers: prov.tmdbId,
+      with_watch_providers: tmdbId,
       page,
       sort_by: 'popularity.desc',
       include_adult: 'false',
