@@ -525,6 +525,19 @@ builder.defineStreamHandler(async ({ type, id }) => {
           ? `Pezzottio ${provLabel}\n📺 ${qualityLabel}`
           : `Pezzottio\n📺 ${qualityLabel}`;
         const lines = [titleHeader];
+        // Filename: quando lo stream è debrid (url set) devo differenziare
+        // le N varianti, altrimenti tutti i candidati hanno stesso (name,title)
+        // e Stremio li dedupplica → utente vede 0 stream. Per i torrent P2P
+        // puri (senza url) lascio invariato per backward compat IT.
+        const rawFilename = t.filename || t.title || '';
+        // Rimuovo il tag "[Torrentio]" / "[Comet]" finale aggiunto da external.js
+        const cleanFn = rawFilename.replace(/\s*\[[^\]]+\]\s*$/, '').trim();
+        const headerFirstLine = titleHeader.split('\n')[0];
+        if (url && cleanFn && cleanFn !== headerFirstLine) {
+          // Tronco a ~90 char per non sfondare il layout Stremio
+          const fn = cleanFn.length > 90 ? cleanFn.slice(0, 87) + '...' : cleanFn;
+          lines.push(fn);
+        }
         if (lang === 'en') {
           if (t.english) lines.push('🇺🇸  Audio ENG');
           else if (t.englishSub) lines.push('🇬🇧  SUB ENG');
@@ -536,6 +549,14 @@ builder.defineStreamHandler(async ({ type, id }) => {
         } else {
           if (t.italian) lines.push('🇮🇹  Audio ITA');
           else if (t.italianSub) lines.push('📝  SUB ITA');
+        }
+        // Riga meta per stream debrid: 💾 size · 👥 seeds · 🗂 source
+        if (url) {
+          const metaParts = [];
+          if (t.sizeText) metaParts.push(`💾 ${t.sizeText}`);
+          if (typeof t.seeds === 'number' && t.seeds > 0) metaParts.push(`👥 ${t.seeds}`);
+          if (t.provider) metaParts.push(`🗂 ${t.provider}`);
+          if (metaParts.length) lines.push(metaParts.join(' · '));
         }
         title = lines.join('\n');
       }
